@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import jax.numpy as jnp
 import jax
@@ -241,6 +240,7 @@ if __name__ == "__main__":
     sig = jnp.array([1.0, 0.5])
 
     import tensorflow_probability.substrates.jax as tfp  # pyright: ignore
+    import matplotlib.pyplot as plt
 
     tfd = tfp.distributions
     tfb = tfp.bijectors

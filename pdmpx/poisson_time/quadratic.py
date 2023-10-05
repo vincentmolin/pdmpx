@@ -5,46 +5,12 @@ import numba
 import functools as ft
 
 
-def solve_quadratic_integral_equation(y, a, b, c):
-    """
-    Solves y = \int_0^t (a + bx + cx^2)+ dx for t
-    """
-
-    # a == 0: ab_poisson_time
-    # case c > 0:
-    # P = np.polynomial.Polynomial((0.0, a, b / 2, c / 3))
-    def P(x):
-        return a * x + (b / 2) * x**2 + (c / 3) * x**3
-
-    def solve_P(y, x0, a, b, c):
-        """
-        Solve P(x) = y, x >= x0
-        """
-        shift = np.polynomial.Polynomial((-x0, 1.0))
-        roots = (P(shift) - y).roots()
-        real_roots = roots[np.isreal(roots)]
-        return 0.0
-
-    if c > 0:
-        # find zeros of p(x):
-        # a/c + b/c x + x^2 = 0
-        # (x + b/2c)^2 = -a/c - (b/2c)^2
-        q = -a / c - (b / (2 * c)) ** 2
-        # if q <= 0: always non-negative
-        if q > 0:
-            r0 = -b / (2 * c) + np.sqrt(q)
-            r1 = r0 - 2 * np.sqrt(q)
-            s0 = P(r0) - P(0.0)
-
-            if s0 < y:
-                t = 0.0
-                return t
-            else:
-                t = r1 + solve_P(y - s0, a, b, c)
-
-
 @numba.jit(nopython=True)
 def solve_cubic_eq(poly):  # , only_real_roots=True):
+    """
+    Returns the real roots of the real cubic polynomial
+        poly[0] + poly[1]x + poly[2]x^2 + poly[3]x^3
+    """
     a, b, c, d = poly
     assert d != 0.0
     # x3 + a2x2 + a1x + a0
@@ -84,6 +50,51 @@ def solve_cubic_eq(poly):  # , only_real_roots=True):
         x3 = 2 * np.sqrt(-q) * np.cos(phi3) - a2 / 3
 
         return np.array([x3, x2, x1])
+
+
+def _min_positive_root(a, b, c, d):
+    roots = solve_cubic_eq(a, b, c, d)
+    return np.min([])
+
+
+def solve_quadratic_integral_equation(y, a, b, c):
+    """
+    Solves y = \int_0^t (a + bx + cx^2)+ dx for t
+    """
+
+    # c ≃ 0: ab_poisson_time
+    # case c > 0:
+    # P = np.polynomial.Polynomial((0.0, a, b / 2, c / 3))
+    def P(x):
+        return a * x + (b / 2) * x**2 + (c / 3) * x**3
+
+    def solve_P(y, x0, a, b, c):
+        """
+        Solve P(x) = y, x >= x0
+        """
+        shift = np.polynomial.Polynomial((-x0, 1.0))
+        roots = (P(shift) - y).roots()
+        real_roots = roots[np.isreal(roots)]
+        return 0.0
+
+    if c > 0:
+        # find zeros of p(x):
+        # a/c + b/c x + x^2 = 0
+        # (x + b/2c)^2 = -a/c - (b/2c)^2
+        q = -a / c - (b / (2 * c)) ** 2
+        # if q <= 0: always non-negative
+        if q > 0:
+            r0 = -b / (2 * c) - np.sqrt(q)
+            r1 = r0 + 2 * np.sqrt(q)
+            if r0 < 0.0 and r1 < 0.0:
+                return 0
+            s0 = P(r0) - P(0.0)
+
+            if s0 < y:
+                t = 0.0
+                return t
+            else:
+                t = r1 + solve_P(y - s0, a, b, c)
 
 
 # # @numba.jit(nopython=True)
