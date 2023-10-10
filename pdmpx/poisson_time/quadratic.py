@@ -3,6 +3,11 @@ import jax.numpy as jnp
 import numpy as np
 import numba
 import functools as ft
+from .linear import ab_poisson_time
+
+
+def almost_zero(x, tol=1e-6):
+    return np.abs(x) < tol
 
 
 @numba.jit(nopython=True)
@@ -52,49 +57,73 @@ def solve_cubic_eq(poly):  # , only_real_roots=True):
         return np.array([x3, x2, x1])
 
 
-def _min_positive_root(a, b, c, d):
-    roots = solve_cubic_eq(a, b, c, d)
-    return np.min([])
-
-
 def solve_quadratic_integral_equation(y, a, b, c):
     """
-    Solves y = \int_0^t (a + bx + cx^2)+ dx for t
+    Solves t = argmin { y = \int_0^t (a + bx + cx^2)+ dx }
     """
+    assert y >= 0.0
+    if almost_zero(y):
+        return 0.0
 
-    # c ≃ 0: ab_poisson_time
-    # case c > 0:
-    # P = np.polynomial.Polynomial((0.0, a, b / 2, c / 3))
     def P(x):
         return a * x + (b / 2) * x**2 + (c / 3) * x**3
 
-    def solve_P(y, x0, a, b, c):
+    def solve_P(y):
         """
-        Solve P(x) = y, x >= x0
+        Solve argmin x P(x) = y
         """
-        shift = np.polynomial.Polynomial((-x0, 1.0))
-        roots = (P(shift) - y).roots()
-        real_roots = roots[np.isreal(roots)]
-        return 0.0
+        return np.min(solve_cubic_eq([-y, a, b / 2, c / 3]))
 
-    if c > 0:
+    # c ≃ 0: ab_poisson_time
+    if almost_zero(c):
+        return ab_poisson_time(np.exp(-y), a, b)  # ._.
+    elif c > 0:
         # find zeros of p(x):
         # a/c + b/c x + x^2 = 0
-        # (x + b/2c)^2 = -a/c - (b/2c)^2
-        q = -a / c - (b / (2 * c)) ** 2
+        # (x + b/2c)^2 = -a/c + (b/2c)^2
+        q = -a / c + (b / (2 * c)) ** 2
         # if q <= 0: always non-negative
+        if q <= 0:
+            return solve_P(y)
         if q > 0:
             r0 = -b / (2 * c) - np.sqrt(q)
             r1 = r0 + 2 * np.sqrt(q)
-            if r0 < 0.0 and r1 < 0.0:
-                return 0
-            s0 = P(r0) - P(0.0)
-
-            if s0 < y:
-                t = 0.0
-                return t
+            if r0 < 0.0:
+                return solve_P(y)
             else:
-                t = r1 + solve_P(y - s0, a, b, c)
+                if P(r0) < y:
+                    return solve_P(y)
+                else:
+                    return solve_P(y + P(r1) - P(r0))
+    else:  # c < 0
+        # find zeros of p(x):
+        q = -a / c + (b / (2 * c)) ** 2
+        if q <= 0:
+            return np.inf  # no solution
+        else:
+            r0 = -b / (2 * c) - np.sqrt(q)
+            r1 = r0 + 2 * np.sqrt(q)
+            if r1 < 0.0:
+                return np.inf
+            if r0 < 0.0:
+                if P(r1) < y:
+                    return solve_P(y)
+                else:
+                    return np.inf
+            else:  # r0 >= 0
+                s0 = P(r1) - P(r0)
+                if s0 < y:
+                    return solve_P(y - s0)
+                else:
+                    return np.inf
+
+
+def test_solve_quadratic_integral_equation():
+    for i in range(100):
+        a, b = np.random.normal(loc=2.0, scale=2.0, size=2)
+        c = 1.0 if np.random.uniform() < 0.5 else -1.0
+
+        y = np.random.uniform() * 2.0
 
 
 # # @numba.jit(nopython=True)
