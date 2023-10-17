@@ -2,85 +2,124 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 import functools as ft
-from typing import Any, NamedTuple, Sequence, Tuple, Callable
+from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
+import chex
+from abc import ABC, abstractmethod
+
+RNGKey = Any
+Context = Dict
 
 
-class ParticleState(NamedTuple):
-    x: jnp.ndarray
-    v: jnp.ndarray
+class PDMPState(NamedTuple):
+    params: chex.ArrayTree
+    velocities: chex.ArrayTree
 
 
 class Event(NamedTuple):
     time: float
-    new_state: ParticleState
+    new_state: PDMPState
 
 
-class AbstractDynamics:
-    def forward(self, t, state):
+class TimerEvent(NamedTuple):
+    time: float
+    bound: bool
+
+
+class AbstractDynamics(ABC):
+    @abstractmethod
+    def forward(self, t: float, state: PDMPState) -> PDMPState:
         raise NotImplementedError
 
 
-class AbstractEventHandler:
-    def get_next_event(self, state: ParticleState, rng=None) -> Tuple[float, Callable]:
-        raise NotImplementedError
+class AbstractTimer(ABC):
+    @abstractmethod
+    def __call__(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> Tuple[TimerEvent, Context]:
+        pass
 
 
-class AbstractEventClock:
-    def get_next_event_time(self, state: ParticleState, rng=None) -> float:
-        raise NotImplementedError
-
-    def get_new_state(self, state: ParticleState, rng=None) -> ParticleState:
-        raise NotImplementedError
-
-
-class SimpleEventQueue(AbstractEventHandler):
-    def __init__(self, event_clocks: Sequence[AbstractEventClock]):
-        self.event_clocks = event_clocks
-        self.next_event = None
-
-    def get_next_event(self, state: ParticleState, rng=None) -> Tuple[float, Callable]:
-        event_times = [handler.get_event_time(state) for handler in self.event_clocks]
-        next_event = np.argmin(event_times)
-        next_event_time = event_times[next_event]
-        return next_event_time, self.event_clocks[next_event].get_new_state
+class AbstractKernel(ABC):
+    @abstractmethod
+    def __call__(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> PDMPState:
+        pass
 
 
-class LinearDynamics(AbstractDynamics):
-    def forward(self, t: float, state: ParticleState):
-        return ParticleState(state.x + t * state.v, state.v)
+class AbstractFactor(ABC):
+    @abstractmethod
+    def timer(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> Tuple[TimerEvent, Context]:
+        pass
+
+    @abstractmethod
+    def kernel(self, rng: RNGKey, state: PDMPState, context: Context = {}) -> PDMPState:
+        pass
 
 
-def rng_wrap(fun):
-    def wrapped_fun(rng, *args, **kwargs):
-        rng, key = jax.random.split(rng)
-        return rng, fun(*args, **kwargs, rng=key)
+class FactorTuple(NamedTuple):
+    timer: Callable[
+        [RNGKey, PDMPState, Context], Tuple[TimerEvent, Context]
+    ] | AbstractTimer
+    kernel: Callable[[RNGKey, PDMPState, Context], PDMPState] | AbstractKernel
 
-    return wrapped_fun
+
+Factor = Union[AbstractFactor, FactorTuple]
+
+
+class AbstractContextHandler(ABC):
+    @abstractmethod
+    def __call__(self, context: Context) -> Context:
+        pass
 
 
 class PDMP:
-    def __init__(self, dynamics: AbstractDynamics, event_handler: AbstractEventHandler):
+    def __init__(self, dynamics: AbstractDynamics, factor: Factor):
         self.dynamics = dynamics
-        self.event_handler = event_handler
+        self.factor = factor
 
-    def _next_event(self, time: float, state: ParticleState, rng):
-        key0, key1 = jax.random.split(rng)
-        next_event_time, new_state_fn = self.event_handler.get_next_event(state, key0)
-        time += next_event_time
-        state = self.dynamics.forward(next_event_time, state)
-        state = new_state_fn(state, key1)
-        return Event(time, state)
+    @ft.partial(jax.jit, static_argnums=(0,))
+    def get_next_event(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> Tuple[RNGKey, Event, Context, bool]:
+        rng, key0, key1 = jax.random.split(rng, 3)
+        timer_event, context = self.factor.timer(key0, state, context)
+        time = timer_event.time + context["time"]
+        state = self.dynamics.forward(timer_event.time, state)
+        state, dirty = jax.lax.cond(
+            timer_event.bound,
+            lambda rng, st, *_: (st, False),
+            lambda k, st, ctx: (self.factor.kernel(k, st, ctx), True),
+            key1,
+            state,
+            context,
+        )
+        return rng, Event(time, state), context, dirty
 
     def simulate(
-        self, state: ParticleState, time_max: float, rng=jax.random.PRNGKey(0)
+        self,
+        rng: RNGKey,
+        state: PDMPState,
+        time_max: float,
+        save_trajectory=True,
+        context_handler=None,
+        callbacks=[],
     ) -> Sequence[Event]:
-        time = 0.0
-        events = []
+        context = {"time": 0.0}
+        events = [Event(0.0, state)]
 
-        get_next_event = rng_wrap(self._next_event)
-
-        while time < time_max:
-            rng, event = get_next_event(rng, time, state)
-            time = event.time
+        while context["time"] < time_max:
+            if context_handler is not None:
+                context = context_handler(context)
+            rng, event, context, dirty = self.get_next_event(rng, state, context)
+            state = event.new_state
+            context["time"] = event.time
+            if dirty and save_trajectory:
+                events.append(event)
+            for callback in callbacks:
+                callback(state, context)
+        if not save_trajectory:
             events.append(event)
         return events
