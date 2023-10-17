@@ -14,7 +14,7 @@ class ConstantTimer(AbstractTimer):
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
         time = jax.random.exponential(rng) / self.rate
-        return TimerEvent(time, 1.0), context
+        return TimerEvent(time, 0.0), context
 
 
 class LinearApproxTimer(AbstractTimer):
@@ -23,7 +23,7 @@ class LinearApproxTimer(AbstractTimer):
         self.rate_fn = rate_fn
         self.has_aux = has_aux
 
-    @ft.partial(jax.jit, static_argnums=(0,))
+    #   @ft.partial(jax.jit, static_argnums=(0,))
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
@@ -40,8 +40,8 @@ class LinearApproxTimer(AbstractTimer):
         time = jax_ab_poisson_time(u, a, b)
         event = jax.lax.cond(
             time < self.valid_time,
-            lambda: TimerEvent(time, 1.0),
-            lambda: TimerEvent(self.valid_time, 0.0),
+            lambda: TimerEvent(time, bound=0.0),
+            lambda: TimerEvent(self.valid_time, bound=1.0),
         )
         if self.has_aux:
             return event, {"timer": maybe_aux, **context}

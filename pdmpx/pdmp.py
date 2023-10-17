@@ -26,13 +26,13 @@ class TimerEvent(NamedTuple):
 
 
 class AbstractDynamics(ABC):
-    @abstractmethod
+    # @abstactmethod
     def forward(self, t: float, state: PDMPState) -> PDMPState:
         raise NotImplementedError
 
 
 class AbstractTimer(ABC):
-    @abstractmethod
+    # @abstactmethod
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
@@ -40,7 +40,7 @@ class AbstractTimer(ABC):
 
 
 class AbstractKernel(ABC):
-    @abstractmethod
+    # @abstactmethod
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> PDMPState:
@@ -48,13 +48,13 @@ class AbstractKernel(ABC):
 
 
 class AbstractFactor(ABC):
-    @abstractmethod
+    # @abstactmethod
     def timer(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
         pass
 
-    @abstractmethod
+    # @abstactmethod
     def kernel(self, rng: RNGKey, state: PDMPState, context: Context = {}) -> PDMPState:
         pass
 
@@ -70,7 +70,7 @@ Factor = Union[AbstractFactor, FactorTuple]
 
 
 class AbstractContextHandler(ABC):
-    @abstractmethod
+    # @abstactmethod
     def __call__(self, context: Context) -> Context:
         pass
 

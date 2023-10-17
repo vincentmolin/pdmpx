@@ -14,4 +14,4 @@ def linear_dynamics(t, x, v):
 class LinearDynamics(AbstractDynamics):
     @ft.partial(jax.jit, static_argnums=(0,))
     def forward(self, t: float, state: PDMPState):
-        return PDMPState(*linear_dynamics(t, state.x, state.v))
+        return PDMPState(*linear_dynamics(t, state.params, state.velocities))

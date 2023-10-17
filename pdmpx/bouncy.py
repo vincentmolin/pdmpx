@@ -35,12 +35,12 @@ def create_rate_fn(potential):
     @jax.jit
     def rate_fn(params, velocities, context={}):
         pot, dpot = jax.jvp(lambda ps: potential(ps, context), (params,), (velocities,))
-        return dpot, pot
+        return dpot  # , pot
 
     return rate_fn
 
 
-class BPSReflectionFactor(AbstractFactor):
+class BPSReflectionFactor:  # (AbstractFactor):
     def __init__(self, potential, valid_time=jnp.inf, normalize_velocities=True):
         self.kernel = create_bps_reflection_kernel(potential, normalize_velocities)
         rate_fn = create_rate_fn(potential)
@@ -53,4 +53,4 @@ class BouncyParticleSampler(PDMP):
         refreshments = ConstantRateRefreshments(refreshment_rate)
         queue = SimpleFactorQueue([reflection, refreshments])
         dynamics = LinearDynamics()
-        super().__init__(queue, dynamics)
+        super().__init__(dynamics, queue)

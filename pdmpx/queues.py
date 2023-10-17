@@ -5,7 +5,7 @@ from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, U
 from .pdmp import PDMPState, TimerEvent, AbstractFactor, Factor, Context, RNGKey
 
 
-class SimpleFactorQueue(Factor):
+class SimpleFactorQueue(AbstractFactor):
     def __init__(self, factors: Sequence[Factor]):
         self.factors = factors
 
@@ -15,11 +15,13 @@ class SimpleFactorQueue(Factor):
     ) -> Tuple[TimerEvent, Context]:
         keys = jax.random.split(rng, len(self.factors))
         timer_events = [
-            factor.timer(key, state, context) for key, factor in zip(keys, self.factors)
+            factor.timer(key, state, context)[0]
+            for key, factor in zip(keys, self.factors)
         ]
-        next_event_idx = jnp.argmin([tev.time for tev in timer_events])
-        nev = timer_events[next_event_idx]
-        return TimerEvent(nev.time, nev.bound), {
+        times = jnp.array([tev.time for tev in timer_events])
+        bounds = jnp.array([tev.bound for tev in timer_events])
+        next_event_idx = jnp.argmin(times)
+        return TimerEvent(times[next_event_idx], bounds[next_event_idx]), {
             "simple_factor_queue": {"next_event_idx": next_event_idx},
             **context,
         }
