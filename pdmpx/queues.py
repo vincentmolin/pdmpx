@@ -22,8 +22,8 @@ class SimpleFactorQueue(AbstractFactor):
         bounds = jnp.array([tev.bound for tev in timer_events])
         next_event_idx = jnp.argmin(times)
         return TimerEvent(times[next_event_idx], bounds[next_event_idx]), {
-            "simple_factor_queue": {"next_event_idx": next_event_idx},
             **context,
+            "simple_factor_queue": {"next_event_idx": next_event_idx},
         }
 
     @ft.partial(jax.jit, static_argnums=(0,))
