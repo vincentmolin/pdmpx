@@ -1,6 +1,5 @@
 from .pdmp import PDMPState, AbstractDynamics
 import jax
-import chex
 import functools as ft
 import tree_math as tm
 from typing import NamedTuple

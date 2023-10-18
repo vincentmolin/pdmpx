@@ -7,3 +7,5 @@ from . import queues as queues
 from . import refreshments as refreshments
 from . import dynamics as dynamics
 from . import timers as timers
+
+__version__ = "0.0.1"

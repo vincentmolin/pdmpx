@@ -10,6 +10,10 @@ PyTree = Any
 
 
 class PDMPState(NamedTuple):
+    """
+    PDMP state is a tuple of parameters and velocities
+    """
+
     params: PyTree
     velocities: PyTree
 
