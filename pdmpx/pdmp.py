@@ -1,18 +1,17 @@
-import numpy as np
 import jax.numpy as jnp
 import jax
 import functools as ft
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
-import chex
 from abc import ABC, abstractmethod
 
 RNGKey = Any
 Context = Dict
+PyTree = Any
 
 
 class PDMPState(NamedTuple):
-    params: chex.ArrayTree
-    velocities: chex.ArrayTree
+    params: PyTree
+    velocities: PyTree
 
 
 class Event(NamedTuple):

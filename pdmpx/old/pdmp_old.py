@@ -3,12 +3,13 @@ import jax.numpy as jnp
 import jax
 import functools as ft
 from typing import Any, NamedTuple, Sequence, Tuple, Callable
-import chex
+
+PyTree = Any
 
 
 class PDMPState(NamedTuple):
-    x: chex.ArrayTree
-    v: chex.ArrayTree
+    x: PyTree
+    v: PyTree
 
 
 class Event(NamedTuple):

@@ -1,8 +1,8 @@
 import functools as ft
 import jax
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
-from .poisson_time.linear import jax_ab_poisson_time
-from .pdmp import AbstractTimer, TimerEvent, PDMPState, RNGKey, Context
+from .poisson_time.linear import ab_poisson_time
+from .pdmp import AbstractTimer, TimerEvent, PDMPState, RNGKey, Context, PyTree
 
 
 class ConstantTimer(AbstractTimer):
@@ -18,7 +18,12 @@ class ConstantTimer(AbstractTimer):
 
 
 class LinearApproxTimer(AbstractTimer):
-    def __init__(self, rate_fn: Callable, valid_time: float, has_aux=False):
+    def __init__(
+        self,
+        rate_fn: Callable[[PyTree, PyTree], Union[float, Tuple[float, Any]]],
+        valid_time: float,
+        has_aux=False,
+    ):
         self.valid_time = valid_time
         self.rate_fn = rate_fn
         self.has_aux = has_aux
@@ -37,7 +42,7 @@ class LinearApproxTimer(AbstractTimer):
         a = rate * coldness
         b = drate * coldness
         u = jax.random.uniform(rng)
-        time = jax_ab_poisson_time(u, a, b)
+        time = ab_poisson_time(u, a, b)
         event = jax.lax.cond(
             time < self.valid_time,
             lambda: TimerEvent(time, bound=0.0),

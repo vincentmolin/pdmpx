@@ -1,9 +1,7 @@
-import jax
-import jax.numpy as jnp
 import numpy as np
 import numba
 import functools as ft
-from .linear import ab_poisson_time
+from ..linear import ab_poisson_time
 
 
 def almost_zero(x, tol=1e-6):

@@ -1,7 +1,8 @@
 import jax
 import jax.numpy as jnp
-import numpy as np
-import numba
+
+# import numpy as np
+# import numba
 import functools as ft
 
 
@@ -23,25 +24,10 @@ def poisson_time_stepf(key, rates, ts):
     """
     First arrival time of Poisson process with time-varying piecewise constant rate `rates`.
     """
+    raise NotImplementedError
     # reference time
     x = exp_rand(key)
 
     dts = jnp.diff(ts)
 
     return ts + exp_rand(key, rates)
-
-
-@numba.jit(nopython=True)
-def trapezoid(x, y):
-    return 0.5 * np.sum((x[1:] - x[:-1]) * (y[1:] + y[:-1]))
-
-
-@numba.jit(nopython=True)
-def trapezoid_cum(x, y):
-    return 0.5 * np.cumsum((x[1:] - x[:-1]) * (y[1:] + y[:-1]))
-
-
-class TrapezoidTime:
-    def __call__(self, ts, rates):
-        ref_time = np.random.exponential()
-        raise NotImplementedError

@@ -1,13 +1,12 @@
 from .refreshments import ConstantRateRefreshments
 from .queues import SimpleFactorQueue
 from .dynamics import LinearDynamics
-from .pdmp import PDMP, PDMPState, AbstractFactor, Context
+from .pdmp import PDMP, PDMPState, AbstractFactor, Context, PyTree
 from .timers import LinearApproxTimer
 from .utils.tree import tree_dot, tree_add_scaled, tree_unit_length
 
 import jax
 import jax.numpy as jnp
-import chex
 import functools as ft
 import tree_math as tm
 
@@ -53,4 +52,4 @@ class BouncyParticleSampler(PDMP):
         refreshments = ConstantRateRefreshments(refreshment_rate)
         queue = SimpleFactorQueue([reflection, refreshments])
         dynamics = LinearDynamics()
-        super().__init__(dynamics, queue)
+        super().__init__(dynamics=dynamics, factor=queue)
