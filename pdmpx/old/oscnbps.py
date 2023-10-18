@@ -5,7 +5,7 @@ import numpy as np
 import functools
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from .poisson_time import ab_poisson_time
+from ..poisson_time import ab_poisson_time
 
 # from pdmp.poisson_time import ab_poisson_time
 
