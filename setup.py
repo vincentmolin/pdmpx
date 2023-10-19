@@ -15,7 +15,7 @@
 import setuptools
 
 
-base_requires = ["jax", "numba"]
+base_requires = ["jax", "numba", "tree-math"]
 tests_requires = [
     "jaxlib",
     "pytest",
