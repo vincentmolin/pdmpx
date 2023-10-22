@@ -9,7 +9,7 @@ class SimpleFactorQueue(AbstractFactor):
     def __init__(self, factors: Sequence[Factor]):
         self.factors = factors
 
-    @ft.partial(jax.jit, static_argnums=(0,))
+    #   @ft.partial(jax.jit, static_argnums=(0,))
     def timer(
         self, rng: RNGKey, state: PDMPState, context={}
     ) -> Tuple[TimerEvent, Context]:
@@ -26,7 +26,7 @@ class SimpleFactorQueue(AbstractFactor):
             "simple_factor_queue": {"next_event_idx": next_event_idx},
         }
 
-    @ft.partial(jax.jit, static_argnums=(0,))
+    #   @ft.partial(jax.jit, static_argnums=(0,))
     def kernel(self, rng: RNGKey, state: PDMPState, context={}) -> PDMPState:
         next_event_idx = context["simple_factor_queue"]["next_event_idx"]
         return jax.lax.switch(

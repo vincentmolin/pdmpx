@@ -98,11 +98,6 @@ class PDMP:
             A tuple containing the next event, the updated context, and a boolean
             indicating whether an event has happened or if the state has evolved deterministically.
         """
-
-    def get_next_event(
-        self, rng: RNGKey, state: PDMPState, context: Context = {}
-    ) -> Tuple[Event, Context, bool]:
-        """ """
         timer_key, kernel_key = jax.random.split(rng, 2)
         timer_event, context = self.factor.timer(timer_key, state, context)
         time = timer_event.time + context.get("time", 0.0)

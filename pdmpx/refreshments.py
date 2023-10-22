@@ -9,7 +9,7 @@ class RefreshmentKernel(AbstractKernel):
     def __init__(self, normalize_velocities=False):
         self.normalize_velocities = normalize_velocities
 
-    @ft.partial(jax.jit, static_argnums=(0,))
+    # @ft.partial(jax.jit, static_argnums=(0,))
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> PDMPState:
