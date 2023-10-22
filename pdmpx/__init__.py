@@ -8,4 +8,7 @@ from . import refreshments as refreshments
 from . import dynamics as dynamics
 from . import timers as timers
 
+from .pdmp import PDMPState, PDMP, Context, PyTree, Event
+from .bouncy import BouncyParticleSampler
+
 __version__ = "0.0.1"
