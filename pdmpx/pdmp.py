@@ -29,13 +29,13 @@ class TimerEvent(NamedTuple):
 
 
 class AbstractDynamics(ABC):
-    # @abstactmethod
+    # @abstractmethod
     def forward(self, t: float, state: PDMPState) -> PDMPState:
         raise NotImplementedError
 
 
 class AbstractTimer(ABC):
-    # @abstactmethod
+    # @abstractmethod
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
@@ -43,7 +43,7 @@ class AbstractTimer(ABC):
 
 
 class AbstractKernel(ABC):
-    # @abstactmethod
+    # @abstractmethod
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> PDMPState:
@@ -51,13 +51,13 @@ class AbstractKernel(ABC):
 
 
 class AbstractFactor(ABC):
-    # @abstactmethod
+    # @abstractmethod
     def timer(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
         pass
 
-    # @abstactmethod
+    # @abstractmethod
     def kernel(self, rng: RNGKey, state: PDMPState, context: Context = {}) -> PDMPState:
         pass
 
@@ -73,7 +73,7 @@ Factor = Union[AbstractFactor, FactorTuple]
 
 
 class AbstractContextHandler(ABC):
-    # @abstactmethod
+    # @abstractmethod
     def __call__(self, context: Context) -> Context:
         pass
 
@@ -83,23 +83,39 @@ class PDMP:
         self.dynamics = dynamics
         self.factor = factor
 
-    @ft.partial(jax.jit, static_argnums=(0,))
     def get_next_event(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
-    ) -> Tuple[RNGKey, Event, Context, bool]:
-        rng, key0, key1 = jax.random.split(rng, 3)
-        timer_event, context = self.factor.timer(key0, state, context)
-        time = timer_event.time + context["time"]
+    ) -> Tuple[Event, Context, bool]:
+        """Simulates the PDMP forward.
+
+        Args:
+            rng: A JAX random key used to generate random numbers.
+            state: The current state of the PDMP simulation.
+            context: A dictionary of additional information that can be used by the
+                simulation components.
+
+        Returns:
+            A tuple containing the next event, the updated context, and a boolean
+            indicating whether an event has happened or if the state has evolved deterministically.
+        """
+
+    def get_next_event(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> Tuple[Event, Context, bool]:
+        """ """
+        timer_key, kernel_key = jax.random.split(rng, 2)
+        timer_event, context = self.factor.timer(timer_key, state, context)
+        time = timer_event.time + context.get("time", 0.0)
         state = self.dynamics.forward(timer_event.time, state)
         state, dirty = jax.lax.cond(
             timer_event.bound,
             lambda rng, st, *_: (st, False),
             lambda k, st, ctx: (self.factor.kernel(k, st, ctx), True),
-            key1,
+            kernel_key,
             state,
             context,
         )
-        return rng, Event(time, state), context, dirty
+        return Event(time, state), context, dirty
 
     def simulate(
         self,
@@ -113,10 +129,15 @@ class PDMP:
         context = {"time": 0.0}
         events = [Event(0.0, state)]
 
+        @jax.jit
+        def _get_next_event(rng, state, context):
+            rng, key = jax.random.split(rng)
+            return rng, *self.get_next_event(key, state, context)
+
         while context["time"] < time_max:
             if context_handler is not None:
                 context = context_handler(context)
-            rng, event, context, dirty = self.get_next_event(rng, state, context)
+            rng, event, context, dirty = _get_next_event(rng, state, context)
             state = event.new_state
             context["time"] = event.time
             if dirty and save_trajectory:

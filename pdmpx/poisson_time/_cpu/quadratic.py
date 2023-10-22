@@ -57,7 +57,7 @@ def solve_cubic_eq(poly):  # , only_real_roots=True):
 
 def solve_quadratic_integral_equation(y, a, b, c):
     """
-    Solves t = argmin { y = \int_0^t (a + bx + cx^2)+ dx }
+    Solves t = argmin { y = \\int_0^t (a + bx + cx^2)+ dx }
     """
     assert y >= 0.0
     if almost_zero(y):

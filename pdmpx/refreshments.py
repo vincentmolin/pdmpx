@@ -1,7 +1,7 @@
 import jax
 import functools as ft
 from .pdmp import AbstractKernel, PDMPState, RNGKey, Context, AbstractFactor
-from .timers import ConstantTimer
+from .timers import ConstantRateTimer
 from .utils.tree import tree_random_normal, tree_unit_length
 
 
@@ -21,5 +21,5 @@ class RefreshmentKernel(AbstractKernel):
 
 class ConstantRateRefreshments(AbstractFactor):
     def __init__(self, rate: float, normalize_velocities=False):
-        self.timer = ConstantTimer(rate)
+        self.timer = ConstantRateTimer(rate)
         self.kernel = RefreshmentKernel(normalize_velocities)

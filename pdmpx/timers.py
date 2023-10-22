@@ -5,11 +5,11 @@ from .poisson_time.linear import ab_poisson_time
 from .pdmp import AbstractTimer, TimerEvent, PDMPState, RNGKey, Context, PyTree
 
 
-class ConstantTimer(AbstractTimer):
+class ConstantRateTimer(AbstractTimer):
     def __init__(self, rate: float):
         self.rate = rate
 
-    @ft.partial(jax.jit, static_argnums=(0,))
+    # @ft.partial(jax.jit, static_argnums=(0,))
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
@@ -28,7 +28,6 @@ class LinearApproxTimer(AbstractTimer):
         self.rate_fn = rate_fn
         self.has_aux = has_aux
 
-    #   @ft.partial(jax.jit, static_argnums=(0,))
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:

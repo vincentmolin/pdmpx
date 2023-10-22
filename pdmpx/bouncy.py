@@ -47,9 +47,11 @@ class BPSReflectionFactor:  # (AbstractFactor):
 
 
 class BouncyParticleSampler(PDMP):
-    def __init__(self, potential, refreshment_rate, valid_time=jnp.inf):
-        reflection = BPSReflectionFactor(potential, valid_time)
-        refreshments = ConstantRateRefreshments(refreshment_rate)
+    def __init__(
+        self, potential, refreshment_rate, valid_time=jnp.inf, normalize_velocities=True
+    ):
+        reflection = BPSReflectionFactor(potential, valid_time, normalize_velocities)
+        refreshments = ConstantRateRefreshments(refreshment_rate, normalize_velocities)
         queue = SimpleFactorQueue([reflection, refreshments])
         dynamics = LinearDynamics()
         super().__init__(dynamics=dynamics, factor=queue)
