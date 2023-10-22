@@ -5,7 +5,7 @@ Checklist (Tuesday lunch):
  * [ ] Refactor over thinning timer
  * [ ] Add examples from poster, BPS
    * Simple Cold BPS impl.
- * [ ] Add tests
+ * [x] Add tests
  * [ ] Finish typings, add comments for the most exposed
 
 Checklist (Additional):
