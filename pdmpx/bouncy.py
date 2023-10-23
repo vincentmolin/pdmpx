@@ -58,7 +58,27 @@ def create_rate_fn(potential, dynamics=LinearDynamics(), return_aux=False):
     return rate_fn
 
 
-class BPSReflectionFactor:  # (AbstractFactor):
+class GeneralizedBounceFactor:
+    def __init__(
+        self,
+        potential,
+        valid_time=jnp.inf,
+        gradient_mix=0.0,
+        oscn=0,
+        coldness=1,
+        normalize_velocities=True,
+        with_aux=False,
+    ):
+        self.kernel = create_generalized_bounce_kernel(
+            potential, gradient_mix, oscn, normalize_velocities
+        )
+        rate_fn = create_rate_fn(potential, return_aux=with_aux)
+        self.timer = LinearApproxTimer(
+            rate_fn, valid_time, has_aux=with_aux, timescale=coldness
+        )
+
+
+class BPSBounceFactor:  # (GeneralizedBounceFactor)  # (AbstractFactor):
     def __init__(
         self,
         potential,
@@ -87,13 +107,49 @@ class BouncyParticleSampler(PDMP):
     ):
         """
         Args:
-            potential: Differentiabl potential function of the target distribution up to an additive constant.
+            potential: Differentiable potential function of the target distribution (up to an additive constant).
             refreshment_rate: Rate of refreshments.
             valid_time: Time to trust the linear approximation of the rate.
             normalize_velocities: Run in unit speed.
         """
         potential = maybe_add_dummy_args(potential)
-        bounce = BPSReflectionFactor(potential, valid_time, normalize_velocities)
+        bounce = BPSBounceFactor(potential, valid_time, normalize_velocities)
+        refreshments = ConstantRateRefreshments(refreshment_rate, normalize_velocities)
+        queue = SimpleFactorQueue([bounce, refreshments])
+        dynamics = LinearDynamics()
+        super().__init__(dynamics=dynamics, factor=queue)
+
+
+class ColdBouncyParticleSampler(PDMP):
+    """
+    CBPS
+    """
+
+    def __init__(
+        self,
+        potential,
+        refreshment_rate,
+        gradient_mix,
+        coldness,
+        valid_time=jnp.inf,
+        normalize_velocities=True,
+    ):
+        """
+        Args:
+            potential: Differentiable potential function of the target distribution (up to an additive constant).
+            refreshment_rate: Rate of refreshments.
+            valid_time: Time to trust the linear approximation of the rate.
+            normalize_velocities: Run in unit speed.
+        """
+        potential = maybe_add_dummy_args(potential)
+        bounce = GeneralizedBounceFactor(
+            potential,
+            valid_time=valid_time,
+            gradient_mix=gradient_mix,
+            coldness=coldness,
+            normalize_velocities=normalize_velocities,
+            with_aux=True,
+        )
         refreshments = ConstantRateRefreshments(refreshment_rate, normalize_velocities)
         queue = SimpleFactorQueue([bounce, refreshments])
         dynamics = LinearDynamics()

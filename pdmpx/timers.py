@@ -25,10 +25,12 @@ class LinearApproxTimer(AbstractTimer):
         valid_time: float,
         has_aux=False,
         dynamics=LinearDynamics(),
+        timescale=1.0,
     ):
         self.valid_time = valid_time
         self.rate_fn = rate_fn
         self.has_aux = has_aux
+        self.timescale = timescale
 
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
@@ -39,9 +41,8 @@ class LinearApproxTimer(AbstractTimer):
             (state.velocities,),
             has_aux=self.has_aux,
         )
-        coldness = context.get("coldness", 1.0)
-        a = rate * coldness
-        b = drate * coldness
+        a = rate * self.timescale
+        b = drate * self.timescale
         u = jax.random.uniform(rng)
         time = ab_poisson_time(u, a, b)
         event = jax.lax.cond(

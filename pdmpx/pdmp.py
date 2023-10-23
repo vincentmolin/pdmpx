@@ -93,6 +93,9 @@ class PDMP:
             state: The current state of the PDMP simulation.
             context: A dictionary of additional information that can be used by the
                 simulation components.
+                If context contains the "time" key, the returned event will have
+                the time field incremented "correctly" (i.e. the time field will
+                be the absolute time of the event).
 
         Returns:
             A tuple containing the next event, the updated context, and a boolean
