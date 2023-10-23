@@ -1,12 +1,12 @@
 # pdmpx
 PDMPs in JAX
 
-Checklist (Tuesday lunch):
- * [ ] Refactor over thinning timer
- * [ ] Add examples from poster, BPS
+Checklist:
+ * [ ] write README.md
+ * [x] Refactor over thinning timer (50%)
+ * [x] Add examples from poster
    * Simple Cold BPS impl.
  * [x] Add tests
- * [ ] Finish typings, add comments for the most exposed
 
 Checklist (Additional):
  * [ ] Quadratic approx timer
