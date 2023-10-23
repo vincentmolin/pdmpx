@@ -4,6 +4,7 @@ from .dynamics import LinearDynamics
 from .pdmp import PDMP, PDMPState, AbstractFactor, Context, PyTree
 from .timers import LinearApproxTimer
 from .utils.tree import tree_dot, tree_add_scaled, tree_unit_length
+from .utils.func import maybe_add_dummy_args
 
 import jax
 import jax.numpy as jnp
@@ -13,9 +14,13 @@ import tree_math as tm
 from typing import NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union, Any
 
 
-def create_bps_reflection_kernel(potential, normalize_velocities=True):
-    @jax.jit
-    def reflection(
+def create_generalized_bounce_kernel(
+    potential, gradient_mix=0, oscn=False, normalize_velocities=True
+):
+    if oscn:  # TODO: Add Orthogonal Subspace Crank-Nicolson bounces
+        raise NotImplementedError
+
+    def bounce(
         rng, state: PDMPState, context: Context = {}
     ) -> Tuple[PDMPState, Context]:
         grads = jax.grad(potential)(state.params, context)
@@ -23,35 +28,73 @@ def create_bps_reflection_kernel(potential, normalize_velocities=True):
         dot_prod = tree_dot(grads, vs)
         norm_sq = tree_dot(grads, grads)
         new_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
+        if gradient_mix != 0:
+            vs_norm_sq = tree_dot(vs, vs)
+            reflect_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
+            new_vs = tree_add_scaled(
+                reflect_vs,
+                grads,
+                (1 - gradient_mix),
+                -gradient_mix * jnp.sqrt(vs_norm_sq / norm_sq),
+            )
         if normalize_velocities:
             new_vs = tree_unit_length(new_vs)
         return PDMPState(state.params, new_vs)
 
-    return reflection
+    return bounce
 
 
-def create_rate_fn(potential):
-    @jax.jit
+def create_bps_bounce_kernel(potential, normalize_velocities=True):
+    return create_generalized_bounce_kernel(
+        potential, gradient_mix=0, oscn=False, normalize_velocities=normalize_velocities
+    )
+
+
+def create_rate_fn(potential, dynamics=LinearDynamics(), return_aux=False):
     def rate_fn(params, velocities, context={}):
         pot, dpot = jax.jvp(lambda ps: potential(ps, context), (params,), (velocities,))
-        return dpot  # , pot
+        return (dpot, pot) if return_aux else dpot
 
     return rate_fn
 
 
 class BPSReflectionFactor:  # (AbstractFactor):
-    def __init__(self, potential, valid_time=jnp.inf, normalize_velocities=True):
-        self.kernel = create_bps_reflection_kernel(potential, normalize_velocities)
-        rate_fn = create_rate_fn(potential)
+    def __init__(
+        self,
+        potential,
+        valid_time=jnp.inf,
+        normalize_velocities=True,
+        dynamics=LinearDynamics(),
+    ):
+        self.kernel = create_bps_bounce_kernel(potential, normalize_velocities)
+        rate_fn = create_rate_fn(potential, dynamics)
         self.timer = LinearApproxTimer(rate_fn, valid_time)
 
 
 class BouncyParticleSampler(PDMP):
+    """
+    Bouncy Particle Sampler (BPS) for sampling from a target distribution
+    with a given potential function. The BPS is a PDMP with two factors:
+    bounce and refreshment.
+
+    Currently, the bounce factor is implemented with a linear approximation
+    of the rate function. This approximation is valid for a given time interval
+    (see `valid_time` argument).
+    """
+
     def __init__(
         self, potential, refreshment_rate, valid_time=jnp.inf, normalize_velocities=True
     ):
-        reflection = BPSReflectionFactor(potential, valid_time, normalize_velocities)
+        """
+        Args:
+            potential: Differentiabl potential function of the target distribution up to an additive constant.
+            refreshment_rate: Rate of refreshments.
+            valid_time: Time to trust the linear approximation of the rate.
+            normalize_velocities: Run in unit speed.
+        """
+        potential = maybe_add_dummy_args(potential)
+        bounce = BPSReflectionFactor(potential, valid_time, normalize_velocities)
         refreshments = ConstantRateRefreshments(refreshment_rate, normalize_velocities)
-        queue = SimpleFactorQueue([reflection, refreshments])
+        queue = SimpleFactorQueue([bounce, refreshments])
         dynamics = LinearDynamics()
         super().__init__(dynamics=dynamics, factor=queue)

@@ -42,3 +42,15 @@ def test_bouncy_particle_sampler():
     assert dirt
     assert jnp.allclose(ev.new_state.velocities, -state.velocities)
     assert len(bps.simulate(jax.random.key(0), state, 2.0, {})) > 1
+
+    def potential_no_ctx(x):
+        return potential(x, {})
+    
+    bps = BouncyParticleSampler(potential, 0.001, normalize_velocities=False)
+    state = PDMPState(jnp.ones((3,)), jnp.ones((3,)))
+
+    ev, ctx, dirt = jax.jit(bps.get_next_event)(jax.random.key(0), state, {})
+    assert dirt
+    assert jnp.allclose(ev.new_state.velocities, -state.velocities)
+    assert len(bps.simulate(jax.random.key(0), state, 2.0, {})) > 1
+
