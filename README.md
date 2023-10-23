@@ -15,6 +15,6 @@ Checklist (Additional):
    * Test n-th dir deriv
  * [ ] Add OSCN bounce kernel
  * [ ] gh-pages / docs?
- * [ ] Might be more JAXy to only ever expose the ```get_next_event``` method for a PDMP.
+ * [x] (Covered in example!) Might be more JAXy to only ever expose the ```get_next_event``` method for a PDMP.
        Probably simplifies the context handling everywhere.
 
