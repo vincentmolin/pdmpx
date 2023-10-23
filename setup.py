@@ -33,6 +33,6 @@ setuptools.setup(
         "tests": tests_requires,
     },
     url="https://github.com/vincentmolin/pdmpx",
-    packages=setuptools.find_packages(exclude=("tests",)),  # "]),
+    packages=setuptools.find_packages(exclude=("tests", "examples")),
     python_requires=">=3",
 )
