@@ -27,3 +27,7 @@ def test_linear_dynamics():
         tree_x["b"]["c"] + 10.0 * tree_v["b"]["c"] == forw_10.params["b"]["c"]
     )
     assert jnp.all(tree_x["d"] + 10.0 * tree_v["d"] == forw_10.params["d"])
+
+
+# def test_linear_dynamics_jvp():
+#     simple_state = PDMPState(jnp.zeros((2,)), jnp.array([1.0, 0.1]))

@@ -3,6 +3,7 @@ import jax
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
 from .poisson_time.linear import ab_poisson_time
 from .pdmp import AbstractTimer, TimerEvent, PDMPState, RNGKey, Context, PyTree
+from .dynamics import LinearDynamics
 
 
 class ConstantRateTimer(AbstractTimer):
@@ -23,6 +24,7 @@ class LinearApproxTimer(AbstractTimer):
         rate_fn: Callable[[PyTree, PyTree], Union[float, Tuple[float, Any]]],
         valid_time: float,
         has_aux=False,
+        dynamics=LinearDynamics(),
     ):
         self.valid_time = valid_time
         self.rate_fn = rate_fn
