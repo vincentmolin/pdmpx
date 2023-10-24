@@ -51,8 +51,12 @@ def create_bps_bounce_kernel(potential, normalize_velocities=True):
 
 
 def create_rate_fn(potential, dynamics=LinearDynamics(), return_aux=False):
-    def rate_fn(params, velocities, context={}):
-        pot, dpot = jax.jvp(lambda ps: potential(ps, context), (params,), (velocities,))
+    def rate_fn(state, context={}):
+        pot, dpot = jax.jvp(
+            lambda t: potential(dynamics.forward(t, state).params, context),
+            (0.0,),
+            (1.0,),
+        )
         return (dpot, pot) if return_aux else dpot
 
     return rate_fn
