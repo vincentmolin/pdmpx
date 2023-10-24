@@ -1,14 +1,17 @@
 # pdmpx
-PDMPs in JAX
+PDMPs in JAX!
+
+There are some examples in the [examples folder](examples/).
+
+
+
 
 Checklist:
- * [ ] write README.md
  * [x] Refactor over thinning timer (50%)
  * [x] Add examples from poster
    * Simple Cold BPS impl.
  * [x] Add tests
-
-Checklist (Additional):
+----
  * [ ] Quadratic approx timer
    * Test cpu impl. vs numpy
    * Test jax impl. vs cpu / numpy
