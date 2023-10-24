@@ -64,6 +64,47 @@ class LinearApproxTimer(AbstractTimer):
             return event, context
 
 
+class QuadraticApproxTimer(AbstractTimer):
+    def __init__(
+        self,
+        rate_fn: Callable[[PDMPState, Context], Union[float, Tuple[float, Any]]],
+        valid_time: float,
+        has_aux=False,
+        dynamics=LinearDynamics(),
+        timescale=1.0,
+    ):
+        self.valid_time = valid_time
+        self.rate_fn = rate_fn
+        self.has_aux = has_aux
+        self.timescale = timescale
+        self.dynamics = dynamics
+
+        raise NotImplementedError("QuadraticApproxTimer not implemented yet")
+
+    def __call__(
+        self, rng: RNGKey, state: PDMPState, context: Context = {}
+    ) -> Tuple[TimerEvent, Context]:
+        rate, drate, *maybe_aux = jax.jvp(
+            lambda t: self.rate_fn(self.dynamics.forward(t, state), context),
+            (0.0,),
+            (1.0,),
+            has_aux=self.has_aux,
+        )
+        a = rate * self.timescale
+        b = drate * self.timescale
+        u = jax.random.uniform(rng)
+        time = ab_poisson_time(u, a, b)
+        event = jax.lax.cond(
+            time < self.valid_time,
+            lambda: TimerEvent(time, bound=0.0),
+            lambda: TimerEvent(self.valid_time, bound=1.0),
+        )
+        if self.has_aux:
+            return event, {"timer": maybe_aux, **context}
+        else:
+            return event, context
+
+
 class LinearThinningSlack(NamedTuple):
     a: float
     b: float
@@ -81,6 +122,10 @@ class LinearThinningTimer(AbstractTimer):
         has_aux=False,
         dynamics=LinearDynamics(),
     ):
+        """
+        Defines a timer that simulates Poisson times by upper bounding the rate
+        with a linear function r = (a + bt)+, where (a,b) = (rate,drate) + slack
+        """
         self.rate_fn = rate_fn
         self.valid_time = valid_time
         self.has_aux = has_aux
