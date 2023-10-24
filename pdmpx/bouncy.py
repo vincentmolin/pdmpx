@@ -92,7 +92,7 @@ class BPSBounceFactor:  # (GeneralizedBounceFactor)  # (AbstractFactor):
     ):
         self.kernel = create_bps_bounce_kernel(potential, normalize_velocities)
         rate_fn = create_rate_fn(potential, dynamics)
-        self.timer = LinearApproxTimer(rate_fn, valid_time)
+        self.timer = LinearApproxTimer(rate_fn, valid_time, dynamics=dynamics)
 
 
 class BouncyParticleSampler(PDMP):
