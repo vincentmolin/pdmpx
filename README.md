@@ -1,7 +1,7 @@
 # pdmpx
 PDMPs in JAX!
 
-There are some examples in the examples folder.
+There are some examples in the [examples folder](examples/).
 
 
 
