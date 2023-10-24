@@ -119,8 +119,8 @@ class LinearThinningTimer(AbstractTimer):
             done: float
 
         def body_fn(ls: LoopState) -> LoopState:
-            rng, t, state = ls
-            rng, key_bound, key_a = jax.random.split(rng)
+            rng, t, state = ls.rng, ls.t, ls.state
+            rng, key_bound, key_a = jax.random.split(rng, 3)
             bound_time = ab_poisson_time(jax.random.uniform(key_bound), rate, drate)
 
             def accept_reject(t):
@@ -128,7 +128,7 @@ class LinearThinningTimer(AbstractTimer):
                 a = self.rate_fn(self.dynamics.forward(t, state)) / bound_rate(t)
                 return jax.lax.cond(
                     a > 1.0,  # Upper bound violation
-                    lambda: LoopState(rng, t, state, broken=1, bound=0, done=1),
+                    lambda: LoopState(rng, t, state, broken=1.0, bound=0.0, done=1.0),
                     lambda: jax.lax.cond(
                         u < a,
                         lambda: LoopState(
