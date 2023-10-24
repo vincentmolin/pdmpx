@@ -28,7 +28,7 @@ class LinearApproxTimer(AbstractTimer):
 
     def __init__(
         self,
-        rate_fn: Callable[[PyTree, PyTree], Union[float, Tuple[float, Any]]],
+        rate_fn: Callable[[PDMPState, Context], Union[float, Tuple[float, Any]]],
         valid_time: float,
         has_aux=False,
         dynamics=LinearDynamics(),
@@ -38,14 +38,15 @@ class LinearApproxTimer(AbstractTimer):
         self.rate_fn = rate_fn
         self.has_aux = has_aux
         self.timescale = timescale
+        self.dynamics = dynamics
 
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
         rate, drate, *maybe_aux = jax.jvp(
-            lambda params: self.rate_fn(params, state.velocities, context),
-            (state.params,),
-            (state.velocities,),
+            lambda t: self.rate_fn(self.dynamics.forward(t, state), context),
+            (0.0,),
+            (1.0,),
             has_aux=self.has_aux,
         )
         a = rate * self.timescale
@@ -71,9 +72,11 @@ class LinearThinningSlack(NamedTuple):
 class LinearThinningTimer(AbstractTimer):
     def __init__(
         self,
-        rate_fn: Callable[[PyTree, PyTree], Union[float, Tuple[float, Any]]],
+        rate_fn: Callable[[PDMPState], Union[float, Tuple[float, Any]]],
         valid_time: float,
-        slack: LinearThinningSlack = LinearThinningSlack(1.0, 1.0),
+        slack: Union[
+            LinearThinningSlack, jnp.array, Tuple[float, float]
+        ] = LinearThinningSlack(1.0, 1.0),
         adaptive_slack=True,
         has_aux=False,
         dynamics=LinearDynamics(),
@@ -81,36 +84,99 @@ class LinearThinningTimer(AbstractTimer):
         self.rate_fn = rate_fn
         self.valid_time = valid_time
         self.has_aux = has_aux
+        if not isinstance(slack, LinearThinningSlack):
+            assert len(slack) == 2
+            slack = LinearThinningSlack(*slack)
         self.slack = slack
         self.adaptive_slack = adaptive_slack
+        if self.adaptive_slack:
+            self._adapt_slack = lambda slack, broken: LinearThinningSlack(
+                slack.a + slack.a * (1.0 * broken), slack.b + slack.b * (1.0 * broken)
+            )
+        else:
+            self._adapt_slack = lambda slack, broken: slack
         self.dynamics = dynamics
-        raise NotImplementedError
 
-    def _thinning_loop(self, rng, state: PDMPState, slack):
-        rate, drate = jax.jvp(lambda t: self.rate_fn(*self.dynamics.forward(t, state)))
+        if has_aux:
+            raise NotImplementedError(
+                "LinearThinningTimer requires has_aux=False for now"
+            )
 
-        # def body_fn(rng, t, tau, x, v, rate_bound, grad_evals):
-        #     t += tau
-        #     x += tau * v
-        #     rate_bound = rate_fn(x, v) + c * delta_max * jnp.linalg.norm(v)
-        #     grad_evals += 1
-        #     rng, key = jax.random.split(rng)
-        #     tau = jnp.minimum(jax.random.exponential(key) / rate_bound, delta_max)
-        #     return rng, t, tau, x, v, rate_bound, grad_evals
+    def _thinning_loop(self, rng, state: PDMPState, slack, context={}):
+        rate, drate = jax.jvp(
+            lambda t: self.rate_fn(self.dynamics.forward(t, state), context),
+            (0.0,),
+            (1.0,),
+        )
+        bound_rate = lambda t: rate + slack.a + (drate + slack.b) * t
 
-        # cond_fn = lambda rng, t, tau, x, v, rate_bound, grad_evals: tau == delta_max
-        # init_val = body_fn(rng, 0.0, 0.0, x, v, 0.0, 0)
-        # rng, t, tau, x, v, rate_bound, grad_evals = jax.lax.while_loop(
-        #     lambda args: cond_fn(*args), lambda args: body_fn(*args), init_val
-        # )
-        # return t + tau, x + tau * v, rate_bound, grad_evals
+        class LoopState(NamedTuple):
+            rng: RNGKey
+            t: float
+            state: PDMPState
+            broken: float
+            bound: float
+            done: float
+
+        def body_fn(ls: LoopState) -> LoopState:
+            rng, t, state = ls
+            rng, key_bound, key_a = jax.random.split(rng)
+            bound_time = ab_poisson_time(jax.random.uniform(key_bound), rate, drate)
+
+            def accept_reject(t):
+                u = jax.random.uniform(key_a)
+                a = self.rate_fn(self.dynamics.forward(t, state)) / bound_rate(t)
+                return jax.lax.cond(
+                    a > 1.0,  # Upper bound violation
+                    lambda: LoopState(rng, t, state, broken=1, bound=0, done=1),
+                    lambda: jax.lax.cond(
+                        u < a,
+                        lambda: LoopState(
+                            rng,
+                            t,
+                            state,
+                            broken=0.0,
+                            bound=0.0,
+                            done=1.0,
+                        ),
+                        lambda: LoopState(
+                            rng,
+                            t,
+                            state,
+                            broken=0.0,
+                            bound=0.0,
+                            done=0.0,
+                        ),
+                    ),
+                )
+
+            return jax.lax.cond(
+                t + bound_time > self.valid_time,
+                lambda: LoopState(
+                    rng, self.valid_time, state, broken=0.0, bound=1.0, done=1.0
+                ),
+                lambda: accept_reject(t + bound_time),
+            )
+
+        def cond_fn(ls: LoopState) -> bool:
+            return ls.done == 0.0
+
+        init_val = LoopState(rng, 0.0, state, 0.0, 0.0, 0.0)
+        ls = jax.lax.while_loop(cond_fn, body_fn, init_val)
+
+        return ls.t, ls.broken, ls.bound
 
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
         slack = context.get("linear_thinning_slack", self.slack)
-        event = TimerEvent(0.0, 0.0)
+        time, slack_broken, bound = self._thinning_loop(rng, state, slack, context)
+        slack = self._adapt_slack(slack, slack_broken)
+        context = {"linear_thinning_slack": slack, **context}
+
+        event = TimerEvent(time, bound=bound)
+
         if self.has_aux:
-            return event, {"timer": None, **context}
+            return event, context, None
         else:
             return event, context
