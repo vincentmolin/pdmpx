@@ -1,7 +1,34 @@
 import numpy as np
 import numba
 import functools as ft
-from ..linear import ab_poisson_time
+
+
+@numba.jit(nopython=True)
+def ab_poisson_time(u: float, a: float, b: float) -> float:  # TODO: linear_poisson_time
+    """
+    First arrival time of Poisson process with time-dependent rate `rate = (a + b*t)+`
+    """
+    if b < 0:
+        if a <= 0:
+            return np.inf
+        else:
+            y = -np.log(u)  # reference time
+            if -a / b < y:
+                return (-a - np.sqrt(2 * b * y + a**2)) / b  # solve
+            else:
+                return np.inf
+    elif b == 0:
+        if a <= 0:
+            return np.inf
+        else:
+            return -np.log(u) / a
+    else:  # b > 0
+        if a < 0:
+            y = -np.log(u)
+            return (-a + np.sqrt(2 * b * y)) / b
+        else:
+            y = -np.log(u)
+            return (-a + np.sqrt(2 * b * y + a**2)) / b
 
 
 def almost_zero(x, tol=1e-6):
@@ -60,17 +87,19 @@ def solve_quadratic_integral_equation(y, a, b, c):
     Solves t = argmin { y = \\int_0^t (a + bx + cx^2)+ dx }
     """
     assert y >= 0.0
-    if almost_zero(y):
-        return 0.0
+
+    def almost_zero(v):
+        return np.abs(v) < 1e-8
 
     def P(x):
         return a * x + (b / 2) * x**2 + (c / 3) * x**3
 
-    def solve_P(y):
+    def solve_P(y, min_root=0.0) -> float:
         """
         Solve argmin x P(x) = y
         """
-        return np.min(solve_cubic_eq([-y, a, b / 2, c / 3]))
+        roots = solve_cubic_eq([-y, a, b / 2, c / 3])
+        return roots[roots >= min_root].min()
 
     # c ≃ 0: ab_poisson_time
     if almost_zero(c):
@@ -86,13 +115,16 @@ def solve_quadratic_integral_equation(y, a, b, c):
         if q > 0:
             r0 = -b / (2 * c) - np.sqrt(q)
             r1 = r0 + 2 * np.sqrt(q)
-            if r0 < 0.0:
-                return solve_P(y)
-            else:
-                if P(r0) < y:
+            if r0 <= 0.0:
+                if r1 < 0.0:
                     return solve_P(y)
                 else:
-                    return solve_P(y + P(r1) - P(r0))
+                    return solve_P(y + P(r1), min_root=r1 + 1e-5)
+            else:
+                if P(r0) > y:
+                    return solve_P(y)
+                else:
+                    return solve_P(y + P(r1) - P(r0), min_root=r1)
     else:  # c < 0
         # find zeros of p(x):
         q = -a / c + (b / (2 * c)) ** 2
@@ -104,24 +136,161 @@ def solve_quadratic_integral_equation(y, a, b, c):
             if r1 < 0.0:
                 return np.inf
             if r0 < 0.0:
-                if P(r1) < y:
+                if P(r1) > y:
                     return solve_P(y)
                 else:
                     return np.inf
             else:  # r0 >= 0
                 s0 = P(r1) - P(r0)
-                if s0 < y:
-                    return solve_P(y - s0)
+                if s0 > y:
+                    return solve_P(y + P(r0), min_root=r0)
                 else:
                     return np.inf
 
 
-def test_solve_quadratic_integral_equation():
-    for i in range(100):
+def solve_quadratic_integral_equation2(y, a, b, c):
+    """
+    Solves t = argmin { y = \\int_0^t (a + bx + cx^2)+ dx }
+    """
+    assert y >= 0.0
+
+    def almost_zero(v):
+        return np.abs(v) < 1e-8
+
+    def P(x):
+        return a * x + (b / 2) * x**2 + (c / 3) * x**3
+
+    def solve_P(y, min_root=0.0) -> float:
+        """
+        Solve argmin x P(x) = y
+        """
+        roots = solve_cubic_eq([-y, a, b / 2, c / 3])
+        return roots[roots >= min_root].min()
+
+    # c ≃ 0: ab_poisson_time
+    if almost_zero(c):
+        return ab_poisson_time(np.exp(-y), a, b)  # ._.
+    elif c > 0:
+        # find zeros of p(x):
+        # a/c + b/c x + x^2 = 0
+        # (x + b/2c)^2 = -a/c + (b/2c)^2
+        q = -a / c + (b / (2 * c)) ** 2
+        # if q <= 0: always non-negative
+        if q <= 0:
+            return solve_P(y)
+        if q > 0:
+            r0 = -b / (2 * c) - np.sqrt(q)
+            r1 = r0 + 2 * np.sqrt(q)
+            if r0 <= 0.0:
+                if r1 < 0.0:
+                    return solve_P(y)
+                else:
+                    return solve_P(y + P(r1), min_root=r1 + 1e-5)
+            else:
+                if P(r0) > y:
+                    return solve_P(y)
+                else:
+                    return solve_P(y + P(r1) - P(r0), min_root=r1)
+    else:  # c < 0
+        # find zeros of p(x):
+        q = -a / c + (b / (2 * c)) ** 2
+        if q <= 0:
+            return np.inf  # no solution
+        else:
+            r0 = -b / (2 * c) - np.sqrt(q)
+            r1 = -b / (2 * c) + np.sqrt(q)
+            if r1 < 0.0:
+                return np.inf
+            if r0 < 0.0:
+                if P(r1) > y:
+                    return solve_P(y)
+                else:
+                    return np.inf
+            else:  # r0 >= 0
+                s0 = P(r1) - P(r0)
+                if s0 > y:
+                    return solve_P(y + P(r0), min_root=r0)
+                else:
+                    return np.inf
+
+
+def test_solve_quadratic_integral_equation2():
+    np.random.seed(0)
+    xs = np.linspace(0.0, 5.0, 10000)
+    for i in range(100000):
         a, b = np.random.normal(loc=2.0, scale=2.0, size=2)
         c = 1.0 if np.random.uniform() < 0.5 else -1.0
 
         y = np.random.uniform() * 2.0
+
+        ps = np.maximum(a + b * xs + c * xs**2, 0)
+
+        int_ps = np.cumsum(ps) * (xs[1] - xs[0])
+
+        diffs = np.abs(int_ps - y)
+        if diffs.min() > 1e-3:
+            num_sol = np.inf
+        else:
+            num_sol = xs[np.argmin(diffs)]
+
+        alg_sol = solve_quadratic_integral_equation(y, a, b, c)
+        alg2_sol = solve_quadratic_integral_equation2(y, a, b, c)
+
+        if np.abs(alg_sol - alg2_sol) > 1e-3:
+            fails += 1
+            print("fail")
+            # print(
+            #     f"num_sol {num_sol}, alg_sol {alg_sol} \n (a,b,c) = ({a},{b},{c})\n y = {y}"
+            # )
+
+    print("fails: ", fails)
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(xs, ps)
+    # alg_sol
+    # (lambda x: a * x + (b / 2) * x**2 + (c / 3) * x**3)(num_sol) - y
+
+
+test_solve_quadratic_integral_equation2()
+
+
+def test_solve_quadratic_integral_equation():
+    np.random.seed(0)
+    xs = np.linspace(0.0, 5.0, 10000)
+    for i in range(100000):
+        a, b = np.random.normal(loc=2.0, scale=2.0, size=2)
+        c = 1.0 if np.random.uniform() < 0.5 else -1.0
+
+        y = np.random.uniform() * 2.0
+
+        ps = np.maximum(a + b * xs + c * xs**2, 0)
+
+        int_ps = np.cumsum(ps) * (xs[1] - xs[0])
+
+        diffs = np.abs(int_ps - y)
+        if diffs.min() > 1e-3:
+            num_sol = np.inf
+        else:
+            num_sol = xs[np.argmin(diffs)]
+
+        alg_sol = solve_quadratic_integral_equation(y, a, b, c)
+        fails = 0
+        if np.abs(num_sol - alg_sol) > 1e-1:
+            fails += 1
+            # print("fail")
+            # print(
+            #     f"num_sol {num_sol}, alg_sol {alg_sol} \n (a,b,c) = ({a},{b},{c})\n y = {y}"
+            # )
+
+    print("fails: ", fails)
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(xs, ps)
+    # alg_sol
+    # (lambda x: a * x + (b / 2) * x**2 + (c / 3) * x**3)(num_sol) - y
+
+
+test_solve_quadratic_integral_equation()
 
 
 # # @numba.jit(nopython=True)
