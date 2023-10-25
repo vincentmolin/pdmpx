@@ -2,9 +2,12 @@ import functools as ft
 import jax
 import jax.numpy as jnp
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
+
 from .poisson_time.linear import ab_poisson_time
+from .poisson_time.quadratic import abc_poisson_time
 from .pdmp import AbstractTimer, TimerEvent, PDMPState, RNGKey, Context, PyTree
 from .dynamics import LinearDynamics
+from .utils.dir_derivs import nth_dir_deriv
 
 
 class ConstantRateTimer(AbstractTimer):
@@ -76,31 +79,33 @@ class QuadraticApproxTimer(AbstractTimer):
         self.valid_time = valid_time
         self.rate_fn = rate_fn
         self.has_aux = has_aux
+        if has_aux:
+            raise NotImplementedError(
+                "QuadraticApproxTimer requires has_aux=False for now"
+            )
         self.timescale = timescale
         self.dynamics = dynamics
-
-        raise NotImplementedError("QuadraticApproxTimer not implemented yet")
 
     def __call__(
         self, rng: RNGKey, state: PDMPState, context: Context = {}
     ) -> Tuple[TimerEvent, Context]:
-        rate, drate, *maybe_aux = jax.jvp(
+        rate, drate, ddrate = nth_dir_deriv(
             lambda t: self.rate_fn(self.dynamics.forward(t, state), context),
-            (0.0,),
-            (1.0,),
-            has_aux=self.has_aux,
-        )
+            only_n=False,
+            ravel_out=True,
+        )(0.0, 1.0, 2)
         a = rate * self.timescale
         b = drate * self.timescale
+        c = ddrate * self.timescale
         u = jax.random.uniform(rng)
-        time = ab_poisson_time(u, a, b)
+        time = abc_poisson_time(u, a, b, c)
         event = jax.lax.cond(
             time < self.valid_time,
             lambda: TimerEvent(time, bound=0.0),
             lambda: TimerEvent(self.valid_time, bound=1.0),
         )
         if self.has_aux:
-            return event, {"timer": maybe_aux, **context}
+            return event, {"timer": None, **context}
         else:
             return event, context
 

@@ -21,6 +21,11 @@ def dd2f(psi_fn):
 
 
 def nth_dir_deriv(f, only_n=False, ravel_out=True):
+    """
+    TODO: Thought this was just a curiosity, but it seems to be faster than jet.jet
+    and therefore probably needs a docstring
+    """
+
     @functools.partial(jax.jit, static_argnums=(2,))
     def dnfdvn_internal(x, v, n):
         if n == 0:

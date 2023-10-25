@@ -8,6 +8,7 @@ from pdmpx.timers import (
     LinearThinningTimer,
     LinearThinningSlack,
     TimerEvent,
+    QuadraticApproxTimer,
 )
 
 from pdmpx.dynamics import LinearDynamics
@@ -83,3 +84,28 @@ def test_linear_thinning_timer():
     ltt_event, _ = jax.jit(ltt)(jax.random.key(0), state, {"a": 2.0})
 
     assert isinstance(ltt_event, TimerEvent)
+
+
+def test_quadratic_approx_timer():
+    dynamics = LinearDynamics()
+
+    def potential(params, context={}):
+        return jnp.sum(params**4)
+
+    def rate_fn(state: PDMPState, context={}):
+        _, dpot = jax.jvp(
+            lambda t: potential(dynamics.forward(t, state).params, context),
+            (0.0,),
+            (1.0,),
+        )
+        return dpot
+
+    qat = QuadraticApproxTimer(rate_fn, 1.0, has_aux=False, dynamics=dynamics)
+    state = PDMPState(jnp.ones((2,)), jnp.ones((2,)))
+    qat_event, qat_ctx = qat(jax.random.key(0), state, {"a": 2.0})
+
+    assert isinstance(qat_event, TimerEvent)
+
+    qat_event, _ = jax.jit(qat)(jax.random.key(0), state, {"a": 2.0})
+
+    assert isinstance(qat_event, TimerEvent)
