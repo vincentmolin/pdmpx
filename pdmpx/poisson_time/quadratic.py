@@ -8,10 +8,6 @@ from pdmpx.poisson_time._cpu.quadratic import (
 from .linear import ab_poisson_time
 
 
-def ab_poisson_time(u, a, b):
-    return 0.0
-
-
 def _sign(x):
     return jnp.where(x >= 0, 1.0, -1.0)
 
@@ -137,5 +133,10 @@ def abc_poisson_time(u, a, b, c):
     """
     Returns the first arrival time of Poisson process with time-dependent rate
         rate = (a + b*t + c*t^2)+
+    Args:
+        u: Uniform random variable in [0, 1)
+        a: Constant term
+        b: Linear term
+        c: Quadratic term
     """
     return solve_quadratic_integral_equation(-jnp.log(1.0 - u), a, b, c)
