@@ -7,11 +7,12 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:  # TODO: linear_pois
     """
     First arrival time of Poisson process with time-dependent rate `rate = (a + b*t)+`
     """
+
+    y = -np.log(1.0 - u)  # reference time
     if b < 0:
         if a <= 0:
             return np.inf
         else:
-            y = -np.log(u)  # reference time
             if -a / b < y:
                 return (-a - np.sqrt(2 * b * y + a**2)) / b  # solve
             else:
@@ -20,13 +21,11 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:  # TODO: linear_pois
         if a <= 0:
             return np.inf
         else:
-            return -np.log(u) / a
+            return y / a
     else:  # b > 0
         if a < 0:
-            y = -np.log(u)
             return (-a + np.sqrt(2 * b * y)) / b
         else:
-            y = -np.log(u)
             return (-a + np.sqrt(2 * b * y + a**2)) / b
 
 
