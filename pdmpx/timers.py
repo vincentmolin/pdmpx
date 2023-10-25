@@ -222,7 +222,7 @@ class LinearThinningTimer(AbstractTimer):
         slack = context.get("linear_thinning_slack", self.slack)
         time, slack_broken, bound = self._thinning_loop(rng, state, slack, context)
         slack = self._adapt_slack(slack, slack_broken)
-        context = {"linear_thinning_slack": slack, **context}
+        context = {**context, "linear_thinning_slack": slack}
 
         event = TimerEvent(time, bound=bound)
 
