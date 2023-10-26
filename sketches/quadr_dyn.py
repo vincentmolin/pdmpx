@@ -20,7 +20,7 @@ class QuadraticDynamics(pdmpx.dynamics.AbstractDynamics):
         return pdmpx.PDMPState(
             params={
                 "x": state.params["x"]
-                + t * state.velocities["x"]
+                + t * state.velocities["v"]
                 + 0.5 * t**2 * state.velocities["v"],
                 "v": state.params["v"] + t * state.velocities["v"],
             },
@@ -35,9 +35,21 @@ dynamics = QuadraticDynamics()
 # dynamics = pdmpx.dynamics.LinearDynamics()
 dynamics.forward(1.0, state)
 
+mean = jnp.array([1.0, 1.0])
+cov = jnp.array([[1.0, 0.5], [0.0, 1.0]])
+
+
+def x_potential(params, ctx={}):
+    # return jax.scipy.stats.multivariate_normal.logpdf(params["x"], mean, cov)
+    return jnp.sum((params["x"] - mean) ** 2) / 2
+
+
+def v_potential(params, ctx={}):
+    return jnp.sum(params["v"] ** 2) / 2
+
 
 def potential(params, ctx={}):
-    return jnp.sum(params["x"] ** 2)
+    return x_potential(params, ctx) + v_potential(params, ctx)
 
 
 @jax.jit
@@ -46,14 +58,23 @@ def next_event(rng, state):
     bounce_factor = pdmpx.bouncy.BPSBounceFactor(
         potential, 1.0, normalize_velocities=False, dynamics=dynamics
     )
-    refresh_factor = pdmpx.refreshments.ConstantRateRefreshments(0.1)
+    refresh_factor = pdmpx.refreshments.ConstantRateRefreshments(
+        0.1, normalize_velocities=True
+    )
     factor_queue = pdmpx.queues.SimpleFactorQueue([bounce_factor, refresh_factor])
-    return rng, *pdmpx.PDMP(dynamics, factor_queue).get_next_event(key, state)
+
+    event, context, dirty = pdmpx.PDMP(dynamics, factor_queue).get_next_event(
+        key, state
+    )
+    new_state = event.new_state
+    new_state.params["v"] = new_state.velocities["x"]
+    event = pdmpx.Event(event.time, new_state)
+    return rng, event, context, dirty
 
 
 rng, ev, context, dirty = next_event(jax.random.key(0), state)
 context["time"] = ev.time
-T = 500.0
+T = 50.0
 events = []
 ts = []
 t = 0.0
@@ -64,9 +85,10 @@ while t < T:
     events.append(ev)
     ts.append(t)
 
-
 xs = [ev.new_state.params["x"] for ev in events]
 xs = np.array(xs)
+vs = [ev.new_state.params["v"] for ev in events]
+vs = np.array(vs)
 states = [ev.new_state for ev in events]
 
 
@@ -91,7 +113,7 @@ def discretize(ts, states, n=5000):
 tm, xd = discretize(ts, states)
 x0cum_avg = np.cumsum(xd[:, 0]) / np.arange(1, len(xd) + 1)
 x1cum_avg = np.cumsum(xd[:, 1]) / np.arange(1, len(xd) + 1)
-fig, axs = plt.subplots(1, 2, figsize=(16, 9))
+fig, axs = plt.subplots(1, 3, figsize=(16, 6))
 axs[0].plot(xd[:, 0], xd[:, 1])
 axs[0].set_title("Trajectory")
 axs[0].set_xlabel("x0")
@@ -102,5 +124,6 @@ axs[1].plot(tm, x0cum_avg, "--", label="x0 cum avg", color="C0")
 axs[1].plot(tm, x1cum_avg, "--", label="x1 cum avg", color="C1")
 axs[1].set_title("Coordinate traces")
 axs[1].legend()
+axs[2].plot(vs[:, 0], vs[:, 1])
 fig.suptitle("Bouncy Particle Sampler with Quadratic Dynamics targeting a Gaussian")
 plt.show()
