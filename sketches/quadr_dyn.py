@@ -5,7 +5,54 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import NamedTuple
 
-x0 = jnp.array([1.0, 1.0])
+pdmpx.utils.dir_derivs.nth_dir_deriv(lambda t: t**2, only_n=True)(0.0, 1.0, 2)
+
+
+class QuadraticDynamics(pdmpx.dynamics.AbstractDynamics):
+    def forward(self, t, state: pdmpx.PDMPState):
+        v = state.params["v"]
+        a = state.velocities["v"]
+        x = state.params["x"] + t * v + 0.5 * t**2 * a
+        v = v + t * a
+        return pdmpx.PDMPState(
+            params={"x": x, "v": v},
+            velocities={"x": jnp.zeros(x.shape), "v": v},
+        )
+
+
+class QuadraticBounceFactor:  # (pdmpx.pdmp.AbstractFactor):
+    def __init__(self, potential, valid_time):
+        self.potential = potential
+        self.valid_time = valid_time
+        self.dynamics = QuadraticDynamics()
+        self.rates_fn = lambda state: pdmpx.utils.dir_derivs.nth_dir_deriv(
+            lambda t: self.potential(self.dynamics.forward(t, state).params)
+        )(0.0, 1.0, 2)
+
+    def timer(self, rng, state, ctx={}):
+        time_key, event_key = jax.random.split(rng)
+        # time = jax.random.exponential(time_key) / self.rates_fn(state)
+        raise NotImplementedError
+        return pdmpx.timers.TimerEvent(time, 0.0), ctx
+
+
+# return pdmpx.PDMPState(
+#     params={
+#         "x": state.params["x"]
+#         + t * state.params["v"]
+#         + 0.5 * t**2 * state.velocities["v"],
+#         "v": state.params["v"] + t * state.velocities["v"],
+#     },
+#     velocities={
+#         "x": jnp.zeros(
+#             state.params["x"].shape
+#         ),  # state.velocities["x"] + t * state.velocities["v"],
+#         "v": state.velocities["v"],
+#     },
+# )
+
+
+x0 = jnp.array([0.5, 1.0])
 v0 = jnp.array([0.5, -0.7])
 a0 = jnp.array([1.0, 0.0])
 
@@ -13,22 +60,6 @@ state = pdmpx.PDMPState(
     params={"x": x0, "v": v0},
     velocities={"x": v0, "v": a0},
 )
-
-
-class QuadraticDynamics(pdmpx.dynamics.AbstractDynamics):
-    def forward(self, t, state: pdmpx.PDMPState):
-        return pdmpx.PDMPState(
-            params={
-                "x": state.params["x"]
-                + t * state.velocities["v"]
-                + 0.5 * t**2 * state.velocities["v"],
-                "v": state.params["v"] + t * state.velocities["v"],
-            },
-            velocities={
-                "x": state.velocities["x"] + t * state.velocities["v"],
-                "v": state.velocities["v"],
-            },
-        )
 
 
 dynamics = QuadraticDynamics()
@@ -52,6 +83,9 @@ def potential(params, ctx={}):
     return x_potential(params, ctx) + v_potential(params, ctx)
 
 
+# jax.grad(potential)(state.params)
+
+
 @jax.jit
 def next_event(rng, state):
     rng, key = jax.random.split(rng)
@@ -67,7 +101,7 @@ def next_event(rng, state):
         key, state
     )
     new_state = event.new_state
-    new_state.params["v"] = new_state.velocities["x"]
+    # new_state.params["v"] = new_state.velocities["x"]
     event = pdmpx.Event(event.time, new_state)
     return rng, event, context, dirty
 

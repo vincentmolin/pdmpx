@@ -7,7 +7,7 @@ from pdmpx.utils.tree import tree_random_normal, tree_unit_length
 import numpy as np
 import matplotlib.pyplot as pl
 
-N_PARTICLES = 4
+N_PARTICLES = 3
 
 xs = {i: jnp.zeros((2,)) for i in range(N_PARTICLES)}
 xs = tree_random_normal(jr.key(0), xs)
@@ -123,7 +123,7 @@ def next_event(rng, state, ctx):
         )
         for i in range(N_PARTICLES)
     ]
-    rff = RocketRefreshmentFactor(2.0 * N_PARTICLES, 0.8, 0.0, 0.1)
+    rff = RocketRefreshmentFactor(1.2 * N_PARTICLES, 0.4, 0.4, 0.2)
 
     pdmp = pdmpx.PDMP(
         dynamics=pdmpx.dynamics.LinearDynamics(),
@@ -151,7 +151,7 @@ ts = []
 rng = jr.key(0)
 state = state0  # pdmpx.PDMPState(xs, vs)
 ctx = {"time": 0.0}
-for _ in range(500):
+for _ in range(50):
     rng, ev, ctx, _, evtype, rfftype = next_event(rng, state, ctx)
     state = ev.new_state
     ts.append(ctx["time"])
