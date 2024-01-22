@@ -1,9 +1,9 @@
 import jax
 import jax.numpy as jnp
 
-from pdmpx.poisson_time._cpu.quadratic import (
-    solve_quadratic_integral_equation as cpu_solve_quadratic_integral_equation,
-)
+# from pdmpx.poisson_time._cpu.quadratic import (
+#     solve_quadratic_integral_equation as cpu_solve_quadratic_integral_equation,
+# )
 
 from .linear import ab_poisson_time
 
