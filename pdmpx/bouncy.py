@@ -13,12 +13,41 @@ import tree_math as tm
 
 from typing import NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union, Any
 
+# class GradientMixing:
+#     @staticmethod
+#     def none(gs, rvs):
+#         return rvs
+
+#     @staticmethod
+#     def convex(mix, gs, rvs):
+#         vs_norm_sq =
+#         return tree_add_scaled(
+#             reflect_vs,
+#             grads,
+#             (1 - mix),
+#             -mix * jnp.sqrt(vs_norm_sq / norm_sq),
+#         )
+
 
 def create_generalized_bounce_kernel(
-    potential, gradient_mix=0, oscn=False, normalize_velocities=True
+    potential,
+    gradient_mix=0,
+    oscn=False,
+    normalize_velocities=True,
+    fletcher_reeves=False,
 ):
+    """
+    TODO: Pretty poor naming and implementation.
+    """
     if oscn:  # TODO: Add Orthogonal Subspace Crank-Nicolson bounces
         raise NotImplementedError
+
+    if gradient_mix and fletcher_reeves:
+        warn = (
+            "Gradient mixing and Fletcher-Reeves incompatible. Using Fletcher-Reeves."
+        )
+        print(warn)
+        gradient_mix = 0
 
     def bounce(
         rng, state: PDMPState, context: Context = {}
@@ -27,16 +56,26 @@ def create_generalized_bounce_kernel(
         vs = state.velocities
         dot_prod = tree_dot(grads, vs)
         norm_sq = tree_dot(grads, grads)
-        new_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
-        if gradient_mix != 0:
+        reflect_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
+
+        if fletcher_reeves:
             vs_norm_sq = tree_dot(vs, vs)
-            reflect_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
+            alpha = vs_norm_sq / (norm_sq + vs_norm_sq)
+            if fletcher_reeves == "no_reflect":
+                new_vs = tree_add_scaled(vs, grads, 1 - alpha, -alpha)
+            else:
+                new_vs = tree_add_scaled(reflect_vs, grads, 1 - alpha, -alpha)
+        elif gradient_mix:
+            vs_norm_sq = tree_dot(vs, vs)
             new_vs = tree_add_scaled(
                 reflect_vs,
                 grads,
                 (1 - gradient_mix),
                 -gradient_mix * jnp.sqrt(vs_norm_sq / norm_sq),
             )
+        else:
+            new_vs = reflect_vs
+
         if normalize_velocities:
             new_vs = tree_unit_length(new_vs)
         return PDMPState(state.params, new_vs)
@@ -72,9 +111,14 @@ class GeneralizedBounceFactor:
         coldness=1,
         normalize_velocities=True,
         with_aux=False,
+        fletcher_reeves=False,
     ):
         self.kernel = create_generalized_bounce_kernel(
-            potential, gradient_mix, oscn, normalize_velocities
+            potential,
+            gradient_mix,
+            oscn,
+            normalize_velocities,
+            fletcher_reeves=fletcher_reeves,
         )
         rate_fn = create_rate_fn(potential, return_aux=with_aux)
         self.timer = LinearApproxTimer(
@@ -127,6 +171,7 @@ class BouncyParticleSampler(PDMP):
 class ColdBouncyParticleSampler(PDMP):
     """
     CBPS
+    TODO: Rework or remove.
     """
 
     def __init__(
@@ -137,6 +182,7 @@ class ColdBouncyParticleSampler(PDMP):
         coldness,
         valid_time=jnp.inf,
         normalize_velocities=True,
+        fletcher_reeves=False,
     ):
         """
         Args:
@@ -153,6 +199,7 @@ class ColdBouncyParticleSampler(PDMP):
             coldness=coldness,
             normalize_velocities=normalize_velocities,
             with_aux=True,
+            fletcher_reeves=fletcher_reeves,
         )
         refreshments = ConstantRateRefreshments(refreshment_rate, normalize_velocities)
         queue = SimpleFactorQueue([bounce, refreshments])
