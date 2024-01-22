@@ -26,7 +26,7 @@ def nth_dir_deriv(f, only_n=False, ravel_out=True):
     and therefore probably needs a docstring
     """
 
-    @functools.partial(jax.jit, static_argnums=(2,))
+    @functools.partial(jax.jit, static_argnums=(2,), inline=True)
     def dnfdvn_internal(x, v, n):
         if n == 0:
             return f(x)
@@ -39,7 +39,7 @@ def nth_dir_deriv(f, only_n=False, ravel_out=True):
             )
             return ts, (ps, lower_ps)
 
-    @functools.partial(jax.jit, static_argnums=(2,))
+    @functools.partial(jax.jit, static_argnums=(2,), inline=True)
     def dnfdvn(x, v, n):
         o, *s = dnfdvn_internal(x, v, n)
         if only_n:
@@ -53,7 +53,7 @@ def nth_dir_deriv(f, only_n=False, ravel_out=True):
 
 
 def nth_dir_deriv_jet(f, only_n=False, ravel_out=True):
-    @functools.partial(jax.jit, static_argnums=(2,))
+    @functools.partial(jax.jit, static_argnums=(2,), inline=True)
     def dnfdvn_jet(x, v, n):
         tns = [v] + [jnp.zeros_like(v)] * (n - 1)
         f0, tns = jet.jet(f, (x,), (tns,))
