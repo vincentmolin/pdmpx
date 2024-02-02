@@ -31,7 +31,7 @@ from typing import NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union,
 
 def create_generalized_bounce_kernel(
     potential,
-    gradient_mix=0,
+    gradient_mix=None,
     oscn=False,
     normalize_velocities=True,
     fletcher_reeves=False,
@@ -42,12 +42,12 @@ def create_generalized_bounce_kernel(
     if oscn:  # TODO: Add Orthogonal Subspace Crank-Nicolson bounces
         raise NotImplementedError
 
-    if gradient_mix and fletcher_reeves:
-        warn = (
-            "Gradient mixing and Fletcher-Reeves incompatible. Using Fletcher-Reeves."
-        )
-        print(warn)
-        gradient_mix = 0
+    # if gradient_mix and fletcher_reeves:
+    #     warn = (
+    #         "Gradient mixing and Fletcher-Reeves incompatible. Using Fletcher-Reeves."
+    #     )
+    #     print(warn)
+    #     gradient_mix = 0
 
     def bounce(
         rng, state: PDMPState, context: Context = {}
@@ -65,7 +65,7 @@ def create_generalized_bounce_kernel(
                 new_vs = tree_add_scaled(vs, grads, 1 - alpha, -alpha)
             else:
                 new_vs = tree_add_scaled(reflect_vs, grads, 1 - alpha, -alpha)
-        elif gradient_mix:
+        elif gradient_mix is not None:
             vs_norm_sq = tree_dot(vs, vs)
             new_vs = tree_add_scaled(
                 reflect_vs,
@@ -85,7 +85,10 @@ def create_generalized_bounce_kernel(
 
 def create_bps_bounce_kernel(potential, normalize_velocities=True):
     return create_generalized_bounce_kernel(
-        potential, gradient_mix=0, oscn=False, normalize_velocities=normalize_velocities
+        potential,
+        gradient_mix=None,
+        oscn=False,
+        normalize_velocities=normalize_velocities,
     )
 
 
