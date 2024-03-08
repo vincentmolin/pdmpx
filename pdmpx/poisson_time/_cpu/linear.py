@@ -13,7 +13,7 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:  # TODO: linear_pois
         if a <= 0:
             return np.inf
         else:
-            if -a / b < y:
+            if y < -(a**2) / (2 * b):
                 return (-a - np.sqrt(2 * b * y + a**2)) / b  # solve
             else:
                 return np.inf

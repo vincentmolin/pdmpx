@@ -29,3 +29,7 @@ def test_ab_poisson_time():
 
     a, b = 10.0, 1.0
     assert allclose(cpu_ab_poisson_time(cus[4], a, b), ab_poisson_time(us[4], a, b))
+
+    a, b = 0.09240358, -0.48632997
+    u = 0.2
+    assert ab_poisson_time(u, a, b) == np.inf

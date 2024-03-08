@@ -13,7 +13,7 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:
             a <= 0,
             jnp.inf,
             jax.lax.select(
-                -a / b < y,
+                y < -(a**2) / (2 * b),
                 (-a - jnp.sqrt(2 * b * y + a**2)) / b,
                 jnp.inf,
             ),
