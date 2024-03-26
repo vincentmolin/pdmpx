@@ -33,3 +33,8 @@ def test_ab_poisson_time():
     a, b = 0.09240358, -0.48632997
     u = 0.2
     assert ab_poisson_time(u, a, b) == np.inf
+
+    # sanity check
+    a, b = 1.0, -1.0
+    u = 0.2
+    assert ab_poisson_time(u, a, b) <= 1.0

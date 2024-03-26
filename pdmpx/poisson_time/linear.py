@@ -14,7 +14,7 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:
             jnp.inf,
             jax.lax.select(
                 y < -(a**2) / (2 * b),
-                (-a - jnp.sqrt(2 * b * y + a**2)) / b,
+                -a / b - jnp.sqrt(2 * y / b + a**2 / b**2),
                 jnp.inf,
             ),
         ),
@@ -23,8 +23,8 @@ def ab_poisson_time(u: float, a: float, b: float) -> float:
             jax.lax.select(a <= 0, jnp.inf, y / a),
             jax.lax.select(
                 a < 0,
-                (-a + jnp.sqrt(2 * b * y)) / b,
-                (-a + jnp.sqrt(2 * b * y + a**2)) / b,
+                -a / b + jnp.sqrt(2 * y / b),
+                -a / b + jnp.sqrt(2 * y / b + a**2 / b**2),
             ),
         ),
     )
