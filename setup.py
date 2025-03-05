@@ -34,7 +34,7 @@ setuptools.setup(
     },
     url="https://github.com/vincentmolin/pdmpx",
     packages=setuptools.find_packages(
-        exclude=("tests", "examples", "sketches", "toyproblems", "interactive")
+        exclude=("tests", "examples", "sketches", "deprecated", "interactive")
     ),
     python_requires=">=3",
 )

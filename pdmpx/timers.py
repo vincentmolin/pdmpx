@@ -15,11 +15,14 @@ class ConstantRateTimer(AbstractTimer):
         self.rate = rate
 
     # @ft.partial(jax.jit, static_argnums=(0,))
-    def __call__(
-        self, rng: RNGKey, state: PDMPState, context: Context = {}
-    ) -> Tuple[TimerEvent, Context]:
+    def __call__(self, rng: RNGKey, state: PDMPState) -> Tuple[TimerEvent]:
         time = jax.random.exponential(rng) / self.rate
-        return TimerEvent(time, 0.0), context
+        return TimerEvent(time, 0.0)
+
+
+class LinearApproxPoissonClock:
+    def __init__():
+        pass
 
 
 class LinearApproxTimer(AbstractTimer):
@@ -31,23 +34,15 @@ class LinearApproxTimer(AbstractTimer):
 
     def __init__(
         self,
-        rate_fn: Callable[[PDMPState, Context], Union[float, Tuple[float, Any]]],
+        rate_fn: Callable[[PDMPState], float],
         valid_time: float,
-        has_aux=False,
-        dynamics=LinearDynamics(),
-        timescale=1.0,
     ):
         self.valid_time = valid_time
         self.rate_fn = rate_fn
-        self.has_aux = has_aux
-        self.timescale = timescale
-        self.dynamics = dynamics
 
-    def __call__(
-        self, rng: RNGKey, state: PDMPState, context: Context = {}
-    ) -> Tuple[TimerEvent, Context]:
+    def __call__(self, rng: RNGKey, state: PDMPState) -> TimerEvent:
         rate, drate, *maybe_aux = jax.jvp(
-            lambda t: self.rate_fn(self.dynamics.forward(t, state), context),
+            lambda t: self.rate_fn(self.dynamics.forward(t, state)),
             (0.0,),
             (1.0,),
             has_aux=self.has_aux,
@@ -58,13 +53,10 @@ class LinearApproxTimer(AbstractTimer):
         time = ab_poisson_time(u, a, b)
         event = jax.lax.cond(
             time < self.valid_time,
-            lambda: TimerEvent(time, bound=0.0),
-            lambda: TimerEvent(self.valid_time, bound=1.0),
+            lambda: TimerEvent(time, dirty=1.0, params={}),
+            lambda: TimerEvent(self.valid_time, dirty=0.0, params={}),
         )
-        if self.has_aux:
-            return event, {"timer": maybe_aux, **context}
-        else:
-            return event, context
+        return event
 
 
 class QuadraticApproxTimer(AbstractTimer):
