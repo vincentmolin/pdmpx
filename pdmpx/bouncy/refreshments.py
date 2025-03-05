@@ -1,7 +1,7 @@
 import jax
 import functools as ft
 from ..pdmp import AbstractKernel, PDMPState, RNGKey, TimerEvent
-from ..timers import ConstantRateTimer
+
 from ..utils.tree import tree_random_normal, tree_unit_length
 from .bps import BPSState
 from ..queues import Factor
