@@ -15,15 +15,17 @@ class ConstantRateTimer(AbstractTimer):
         self.rate = rate
 
     # @ft.partial(jax.jit, static_argnums=(0,))
-    def __call__(self, rng: RNGKey, state: PDMPState) -> Tuple[TimerEvent]:
+    def __call__(self, rng: RNGKey, state: PDMPState) -> TimerEvent:
         time = jax.random.exponential(rng) / self.rate
         return TimerEvent(time, 0.0)
 
-
-class LinearApproxPoissonClock:
-    def __init__():
-        pass
-
+def sample_linear_approx_poisson_clock(rng: RNGKey, rate_fn: Callable[[float], float]) -> float:
+    rate, drate = jax.jvp(rate_fn, (0.0,), (1.0,),)
+    a = rate
+    b = drate
+    u = jax.random.uniform(rng)
+    time = ab_poisson_time(u, a, b)
+    return time
 
 class LinearApproxTimer(AbstractTimer):
     """
@@ -41,20 +43,11 @@ class LinearApproxTimer(AbstractTimer):
         self.rate_fn = rate_fn
 
     def __call__(self, rng: RNGKey, state: PDMPState) -> TimerEvent:
-        rate, drate, *maybe_aux = jax.jvp(
-            lambda t: self.rate_fn(self.dynamics.forward(t, state)),
-            (0.0,),
-            (1.0,),
-            has_aux=self.has_aux,
-        )
-        a = rate * self.timescale
-        b = drate * self.timescale
-        u = jax.random.uniform(rng)
-        time = ab_poisson_time(u, a, b)
+        time = sample_linear_approx_poisson_clock(rng, self.rate_fn)
         event = jax.lax.cond(
             time < self.valid_time,
-            lambda: TimerEvent(time, dirty=1.0, params={}),
-            lambda: TimerEvent(self.valid_time, dirty=0.0, params={}),
+            lambda: TimerEvent(time, dirty=1.0),
+            lambda: TimerEvent(self.valid_time, dirty=0.0),
         )
         return event
 

@@ -18,7 +18,7 @@ class Event(NamedTuple):
 class TimerEvent(NamedTuple):
     time: float
     dirty: bool
-    params: PyTree
+    params: PyTree = {}
 
 
 class AbstractDynamics(ABC):

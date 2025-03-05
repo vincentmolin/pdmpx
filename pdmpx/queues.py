@@ -2,37 +2,38 @@ import functools as ft
 import jax
 import jax.numpy as jnp
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
-from .pdmp import PDMPState, TimerEvent, AbstractFactor, Factor, Context, RNGKey
+from .pdmp import PDMPState, TimerEvent, AbstractKernel, AbstractTimer, RNGKey
 
+class Factor(NamedTuple):
+    timer: AbstractTimer
+    kernel: AbstractKernel
 
-class SimpleFactorQueue(AbstractFactor):
+class SimpleFactorQueue:
     def __init__(self, factors: Sequence[Factor]):
         self.factors = factors
 
-    #   @ft.partial(jax.jit, static_argnums=(0,))
     def timer(
-        self, rng: RNGKey, state: PDMPState, context={}
-    ) -> Tuple[TimerEvent, Context]:
+        self, rng: RNGKey, state: PDMPState
+    ) -> TimerEvent:
         keys = jax.random.split(rng, len(self.factors))
         timer_events = [
-            factor.timer(key, state, context)[0]
+            factor.timer(key, state)
             for key, factor in zip(keys, self.factors)
         ]
         times = jnp.array([tev.time for tev in timer_events])
-        bounds = jnp.array([tev.bound for tev in timer_events])
         next_event_idx = jnp.argmin(times)
-        return TimerEvent(times[next_event_idx], bounds[next_event_idx]), {
-            **context,
+        next_event = timer_events[next_event_idx]
+        return TimerEvent(next_event.time, next_event.dirty, {
+            **next_event.params,
             "simple_factor_queue": {"next_event_idx": next_event_idx},
-        }
+        })
 
-    #   @ft.partial(jax.jit, static_argnums=(0,))
-    def kernel(self, rng: RNGKey, state: PDMPState, context={}) -> PDMPState:
-        next_event_idx = context["simple_factor_queue"]["next_event_idx"]
+    def kernel(self, rng: RNGKey, state: PDMPState, timer_event: TimerEvent) -> PDMPState:
+        next_event_idx = timer_event.params["simple_factor_queue"]["next_event_idx"]
         return jax.lax.switch(
             next_event_idx,
             [factor.kernel for factor in self.factors],
             rng,
             state,
-            context,
+            timer_event,
         )
