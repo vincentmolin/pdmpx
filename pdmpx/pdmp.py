@@ -5,7 +5,7 @@ from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, U
 from abc import ABC, abstractmethod
 
 RNGKey = Any
-Context = Dict
+# Context = Dict
 PyTree = Any
 PDMPState = PyTree
 

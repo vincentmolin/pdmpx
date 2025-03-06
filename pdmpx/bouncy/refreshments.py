@@ -1,9 +1,9 @@
 import jax
 import functools as ft
-from ..pdmp import AbstractKernel, PDMPState, RNGKey, TimerEvent
+from ..pdmp import AbstractKernel, RNGKey, TimerEvent
 
 from ..utils.tree import tree_random_normal, tree_unit_length
-from .bps import BPSState
+from .dynamics import BPSState
 from ..queues import Factor
 
 

@@ -9,7 +9,13 @@ from ..pdmp import (
 )
 import functools as ft
 import tree_math as tm
-from .bps import BPSState
+from typing import NamedTuple
+
+
+class BPSState(NamedTuple):
+    params: PyTree
+    velocities: PyTree
+
 
 @ft.partial(tm.wrap, vector_argnames=("x", "v"))
 def linear_dynamics(t, x, v):
@@ -18,4 +24,4 @@ def linear_dynamics(t, x, v):
 
 class LinearDynamics(AbstractDynamics):
     def forward(self, t: float, state: BPSState) -> BPSState:
-        return PDMPState(*linear_dynamics(t, state.params, state.velocities))
+        return BPSState(*linear_dynamics(t, state.params, state.velocities))

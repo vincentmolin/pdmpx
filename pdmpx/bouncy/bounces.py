@@ -9,11 +9,10 @@ from ..pdmp import (
 )
 import functools as ft
 import tree_math as tm
-from .bps import BPSState
 from typing import Callable, Any
 import jax
 
-from .dynamics import LinearDynamics
+from .dynamics import LinearDynamics, BPSState
 
 from ..timers import sample_linear_approx_poisson_clock
 

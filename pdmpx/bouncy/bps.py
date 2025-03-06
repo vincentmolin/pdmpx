@@ -18,13 +18,10 @@ from ..queues import Factor, SimpleFactorQueue
 from typing import NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union, Any
 
 
-class BPSState(NamedTuple):
-    params: PyTree
-    velocities: PyTree
-
-
 class BouncyParticleSampler(PDMP):
-    def __init__(self, potential, refreshment_rate, valid_time, normalize_velocities = True):
+    def __init__(
+        self, potential, refreshment_rate, valid_time, normalize_velocities=True
+    ):
         """
         Args:
             potential: Differentiable potential function of the target distribution (up to an additive constant).
@@ -33,12 +30,10 @@ class BouncyParticleSampler(PDMP):
             normalize_velocities: Run in unit speed.
         """
         bounce_factor = Factor(
-            BounceTimer(potential, valid_time),
-            BounceKernel(potential)
+            BounceTimer(potential, valid_time), BounceKernel(potential)
         )
         refreshment_factor = Factor(
-            ConstantRateTimer(refreshment_rate),
-            RefreshmentKernel(normalize_velocities)
+            ConstantRateTimer(refreshment_rate), RefreshmentKernel(normalize_velocities)
         )
         queue = SimpleFactorQueue([bounce_factor, refreshment_factor])
         dynamics = LinearDynamics()
