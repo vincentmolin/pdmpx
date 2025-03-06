@@ -1,7 +1,16 @@
+from collections import namedtuple
 from .refreshments import ConstantRateRefreshments
 from .queues import SimpleFactorQueue
 from .dynamics import LinearDynamics
-from .pdmp import PDMP, PDMPState, AbstractFactor, Context, PyTree
+from .pdmp import (
+    PDMP,
+    PDMPState,
+    AbstractDynamics,
+    AbstractKernel,
+    AbstractTimer,
+    TimerEvent,
+    PyTree,
+)
 from .timers import LinearApproxTimer
 from .utils.tree import tree_dot, tree_add_scaled, tree_unit_length
 from .utils.func import maybe_add_dummy_args
@@ -11,22 +20,42 @@ import jax.numpy as jnp
 import functools as ft
 import tree_math as tm
 
-from typing import NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union, Any
+from typing import Sequence, Tuple, Callable, Dict, Optional, Union, Any
 
-# class GradientMixing:
-#     @staticmethod
-#     def none(gs, rvs):
-#         return rvs
+BPSState = namedtuple("BPSState", [("params", PyTree), ("velocities", PyTree)])
 
-#     @staticmethod
-#     def convex(mix, gs, rvs):
-#         vs_norm_sq =
-#         return tree_add_scaled(
-#             reflect_vs,
-#             grads,
-#             (1 - mix),
-#             -mix * jnp.sqrt(vs_norm_sq / norm_sq),
-#         )
+
+@ft.partial(tm.wrap, vector_argnames=("x", "v"))
+def linear_dynamics(t, x, v):
+    return x + t * v, v
+
+
+class LinearDynamics(AbstractDynamics):
+    def forward(self, t: float, state: BPSState) -> BPSState:
+        return PDMPState(*linear_dynamics(t, state.params, state.velocities))
+
+
+class BounceKernel(AbstractKernel):
+    def __init__(self, potential: Callable):
+        self.potential = potential
+
+    def __call__(self, rng: Any, state: BPSState, **kwargs) -> BPSState:
+        grads = jax.grad(self.potential)(state.params)
+        vs = state.velocities
+        dot_prod = tree_dot(grads, vs)
+        norm_sq = tree_dot(grads, grads)
+        reflect_vs = tree_add_scaled(vs, grads, 1, -2 * dot_prod / norm_sq)
+        return BPSState(state.params, reflect_vs)
+
+
+class BounceTimer(AbstractTimer):
+    def __init__(self, potential: Callable, valid_time: float):
+        self.potential = potential
+        self.valid_time = valid_time
+
+    def __call__(self, rng: Any, state: BPSState) -> TimerEvent:
+        pot, dpot = jax.jvp(lambda t: self.potential(t, state.params), (0.0,), (1.0,))
+        return TimerEvent(self.valid_time, False, dpot)
 
 
 def create_generalized_bounce_kernel(
