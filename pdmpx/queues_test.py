@@ -6,6 +6,8 @@ from pdmpx.queues import SimpleFactorQueue, Factor
 from pdmpx.timers import ConstantRateTimer
 from pdmpx.utils.kernels import IdentityKernel
 
+import pytest
+
 
 def test_simple_factor_queue():
     crr_slow = Factor(
@@ -26,3 +28,6 @@ def test_simple_factor_queue():
     assert event.dirty == 1.0
     assert event.params["simple_factor_queue"]["next_event_idx"] == 1
     new_state = sfq.kernel(jax.random.key(0), state, event)
+
+    jit_event = jax.jit(sfq.timer)(jax.random.key(0), state)
+    assert jit_event.time == pytest.approx(event.time, 0.01)

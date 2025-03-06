@@ -23,7 +23,7 @@ class BounceKernel(AbstractKernel):
     def __init__(self, potential: Callable):
         self.potential = potential
 
-    def __call__(self, rng: Any, state: BPSState, **kwargs) -> BPSState:
+    def __call__(self, rng: Any, state: BPSState, timer_event: TimerEvent) -> BPSState:
         grads = jax.grad(self.potential)(state.params)
         vs = state.velocities
         dot_prod = tree_dot(grads, vs)
@@ -41,7 +41,7 @@ class BounceTimer(AbstractTimer):
     def __call__(self, rng: Any, state: BPSState) -> TimerEvent:
         def rate_fn(t):
             pot, dpot = jax.jvp(
-                lambda s: self.potential(self.dynamics.forward(s, state.params)),
+                lambda s: self.potential(self.dynamics.forward(s, state).params),
                 (t,),
                 (1.0,),
             )

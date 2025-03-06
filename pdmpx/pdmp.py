@@ -63,14 +63,15 @@ class PDMP:
         timer_event = self.timer(timer_key, state)
         dt = timer_event.time
         state = self.dynamics.forward(dt, state)
-        state, dirty = jax.lax.cond(
+        state = jax.lax.cond(
             timer_event.dirty,
-            lambda rng, st: (st, False),
-            lambda k, st: (self.kernel(k, st), True),
+            lambda k, st, te: self.kernel(k, st, te),
+            lambda rng, st, te: st,
             kernel_key,
             state,
+            timer_event,
         )
-        return state, dt, dirty
+        return state, dt, timer_event.dirty
 
     def simulate(
         self,
