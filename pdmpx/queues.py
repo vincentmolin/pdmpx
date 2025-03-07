@@ -1,4 +1,5 @@
 import functools as ft
+from threading import Timer
 import jax
 import jax.numpy as jnp
 from typing import Any, NamedTuple, Sequence, Tuple, Callable, Dict, Optional, Union
@@ -24,8 +25,8 @@ class SimpleFactorQueue:
         params = [tev.params for tev in timer_events]
         next_event_idx = jnp.argmin(times)
         return TimerEvent(
-            times[next_event_idx],
-            dirtys[next_event_idx],
+            times[next_event_idx],  # pyright: ignore
+            dirtys[next_event_idx],  # pyright: ignore
             {
                 "simple_factor_queue": {
                     "next_event_idx": next_event_idx,
@@ -38,10 +39,19 @@ class SimpleFactorQueue:
         self, rng: RNGKey, state: PDMPState, timer_event: TimerEvent
     ) -> PDMPState:
         next_event_idx = timer_event.params["simple_factor_queue"]["next_event_idx"]
+        paramss = timer_event.params["simple_factor_queue"]["params"]
+
+        def mk_partial_kernel(i):
+            kernel = self.factors[i].kernel
+            params = paramss[i]
+            return lambda r, s: kernel(
+                r, s, TimerEvent(timer_event.time, timer_event.dirty, params=params)
+            )
+
+        partial_kernels = [mk_partial_kernel(i) for i in range(len(self.factors))]
         return jax.lax.switch(
             next_event_idx,
-            [factor.kernel for factor in self.factors],
+            partial_kernels,  # [factor.kernel for factor in self.factors],
             rng,
             state,
-            timer_event,
         )

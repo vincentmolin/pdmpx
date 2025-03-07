@@ -15,10 +15,10 @@ v0 = jr.normal(jr.key(5), (2,))
 initial_state = BPSState(x0, v0)
 
 bps = BouncyParticleSampler(
-    u, refreshment_rate=0.5, valid_time=0.5, normalize_velocities=False
+    u, refreshment_rate=0.005, valid_time=0.5, normalize_velocities=False
 )
 
-events = bps.simulate(jr.key(2), initial_state, 1000)
+events = bps.simulate(jr.key(2), initial_state, 100)
 
 xs = [ev.new_state.params for ev in events]
 xs = jnp.stack(xs)
