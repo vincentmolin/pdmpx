@@ -1,4 +1,18 @@
-from pdmpx.utils.func import num_args, maybe_add_dummy_args
+from pdmpx.utils.func import num_args, maybe_add_dummy_args, rng_wrap
+
+import jax.random as jr
+
+
+def test_rng_wrap(nextkey):
+    def f1(rng, x):
+        return x, jr.normal(rng)
+
+    o = f1(nextkey(), 1)
+    assert len(o) == 2
+
+    r, x, a = rng_wrap(f1)(nextkey(), 23)
+    rr, xx, aa = rng_wrap(f1)(r, x)
+    assert x == xx
 
 
 def test_num_args():
