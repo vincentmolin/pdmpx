@@ -33,10 +33,22 @@ def tree_dot(tree1, tree2):
     )
 
 
-def tree_project(tree, onto):
+def tree_orthogonal_decomposition(tree, onto):
+    """
+    Performs an orthogonal decomposition of the pytree tree
+    with respect to the pytree onto.
+    Returns trees proj, orth such that
+        proj + orth = tree
+    """
     prod = tree_dot(tree, onto)
     normsq = tree_dot(onto, onto)
-    return jtu.tree_map(lambda x, y: x - prod / normsq * y, tree, onto)
+    proj = tree_mul_scalar(onto, prod / normsq)
+    orth = tree_add_scaled(tree, proj, 1, -1)
+    return proj, orth
+
+
+def tree_mul_scalar(tree, scale):
+    return jtu.tree_map(lambda x: scale * x, tree)
 
 
 def tree_add_scaled(tree1, tree2, scale1=1.0, scale2=1.0):
