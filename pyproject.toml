@@ -1,0 +1,29 @@
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"
+
+[project]
+authors = [
+  {name= "Vincent Molin", email = "molinv@chalmers.se"},
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha"
+]
+name = "pdmpx"
+version = "0.1.0"
+description = "PDMPs in JAX"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = ["jax", "numba", "tree-math"]
+urls = {repository = "https://github.com/vincentmolin/pdmpx"}
+
+[dependency-groups]
+dev = [
+  "pytest",
+  "ruff"
+]
+
+[tool.ruff.lint]
+ignore = ["E402", "E721", "E731", "E741", "F722"]
